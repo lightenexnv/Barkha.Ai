@@ -19,17 +19,18 @@ const AssessmentPage = () => {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="mx-auto max-w-page px-6 pb-24 pt-12 lg:pt-16">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {result ? (
           <AssessmentResult result={result} onNewAssessment={handleNewAssessment} />
         ) : (
-          <div className="space-y-12">
-            <div className="max-w-prose animate-fade-up">
-              <p className="eyebrow mb-5">New assessment</p>
-              <h1 className="text-[40px] sm:text-heading-lg">Start your assessment.</h1>
-              <p className="mt-5 text-body text-slate">
-                Get a complete rainwater harvesting feasibility analysis for your property, with
-                recommendations, sizing and a cost breakdown.
+          <div className="space-y-8">
+            <div className="text-center space-y-4">
+              <h1 className="text-3xl lg:text-4xl font-bold">
+                Start Your <span className="gradient-text">Assessment</span>
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Get a comprehensive rainwater harvesting feasibility analysis for your property. 
+                Our AI-powered assessment provides detailed recommendations and cost analysis.
               </p>
             </div>
             

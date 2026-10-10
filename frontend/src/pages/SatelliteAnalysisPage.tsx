@@ -1,14 +1,12 @@
 import React from 'react';
-import { Header } from '@/components/Header';
 import SatelliteAnalysis from '@/components/SatelliteAnalysis';
 
 const SatelliteAnalysisPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="mx-auto max-w-page px-6 pb-24 pt-12 lg:pt-16">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+      <div className="container mx-auto py-8">
         <SatelliteAnalysis />
-      </main>
+      </div>
     </div>
   );
 };
