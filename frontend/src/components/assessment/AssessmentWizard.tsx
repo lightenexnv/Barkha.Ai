@@ -349,11 +349,11 @@ const FineTunePanel = ({
           <div className="grid gap-5 lg:grid-cols-2">
             <div className="space-y-2">
               <Label>{t("form.roofCondition")}</Label>
-              <OptionCardGroup size="sm" label={t("form.roofCondition")} options={ROOF_CONDITION_OPTIONS} value={details.roof_condition} onChange={(v) => set("roof_condition", v)} className="lg:grid-cols-3" />
+              <OptionCardGroup size="sm" label={t("form.roofCondition")} options={ROOF_CONDITION_OPTIONS} value={details.roof_condition} onChange={(v) => set("roof_condition", v)} />
             </div>
             <div className="space-y-2">
               <Label>{t("form.soilType")}</Label>
-              <OptionCardGroup size="sm" label={t("form.soilType")} options={SOIL_TYPE_OPTIONS} value={details.soil_type} onChange={(v) => set("soil_type", v)} className="sm:grid-cols-4 lg:grid-cols-4" />
+              <OptionCardGroup size="sm" label={t("form.soilType")} options={SOIL_TYPE_OPTIONS} value={details.soil_type} onChange={(v) => set("soil_type", v)} />
             </div>
           </div>
           <div className="max-w-xs space-y-1.5">

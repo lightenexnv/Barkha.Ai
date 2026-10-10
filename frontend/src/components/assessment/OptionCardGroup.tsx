@@ -1,4 +1,5 @@
-import { useRef, type KeyboardEvent } from "react";
+import { useRef, type CSSProperties, type KeyboardEvent } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
@@ -9,14 +10,15 @@ interface OptionCardGroupProps<V extends string> {
   options: SiteOption<V>[];
   value: V;
   onChange: (value: V) => void;
-  /** "lg" for the main form, "sm" for the compact fine-tune panel */
+  /** "lg" shows a one-line caption; "sm" is the compact fine-tune version */
   size?: "lg" | "sm";
   className?: string;
 }
 
 /**
- * A radio group drawn as photo cards. The whole card is the hit target; arrow
- * keys move the selection like a native radio group.
+ * A radio group drawn as photo cards, all in one row: one column per option
+ * from tablet width up, and a swipeable row on phones. Arrow keys move the
+ * selection like a native radio group.
  */
 export function OptionCardGroup<V extends string>({
   label,
@@ -44,30 +46,41 @@ export function OptionCardGroup<V extends string>({
     <div
       role="radiogroup"
       aria-label={label}
+      // Large cards share one size across groups (a fifth of the row), so a
+      // three-option group does not get giant cards; compact cards fill the row
+      style={{ "--cols": large ? Math.max(options.length, 5) : options.length } as CSSProperties}
       className={cn(
-        "grid gap-3",
-        large ? "grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5",
+        "-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 pt-1",
+        "md:grid md:snap-none md:grid-cols-[repeat(var(--cols),minmax(0,1fr))] md:overflow-visible md:pb-0",
         className,
       )}
     >
       {options.map((option, index) => {
         const selected = option.value === value;
         return (
-          <button
+          <motion.button
             key={option.value}
             ref={(node) => (refs.current[index] = node)}
             type="button"
             role="radio"
             aria-checked={selected}
             tabIndex={selected ? 0 : -1}
+            title={t(option.caption)}
             onClick={() => onChange(option.value)}
             onKeyDown={(event) => onKeyDown(event, index)}
+            whileHover={{ y: -4 }}
+            whileTap={{ scale: 0.97 }}
+            animate={{ y: selected ? -3 : 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 26 }}
             className={cn(
-              "group relative flex flex-col overflow-hidden rounded-xl border-2 bg-card text-start transition-all duration-200",
+              "group relative flex shrink-0 snap-start flex-col overflow-hidden rounded-xl border-2 bg-card text-start",
+              large ? "w-[44%] min-[480px]:w-[30%]" : "w-[38%] min-[480px]:w-[26%]",
+              "md:w-auto",
+              "transition-[border-color,box-shadow] duration-200",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               selected
-                ? "-translate-y-0.5 border-primary shadow-[0_0_0_4px_hsl(var(--primary)/0.15),0_12px_28px_-10px_hsl(var(--primary)/0.55)]"
-                : "border-border/60 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md",
+                ? "border-primary shadow-[0_0_0_4px_hsl(var(--primary)/0.15),0_12px_28px_-10px_hsl(var(--primary)/0.55)]"
+                : "border-border/60 hover:border-primary/50 hover:shadow-md",
             )}
           >
             <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
@@ -79,31 +92,37 @@ export function OptionCardGroup<V extends string>({
                 draggable={false}
                 className={cn(
                   "h-full w-full object-cover transition-transform duration-500",
-                  selected ? "scale-[1.03]" : "group-hover:scale-[1.03]",
+                  selected ? "scale-[1.04]" : "group-hover:scale-[1.04]",
                 )}
               />
-              <span className="absolute bottom-2 start-2 rounded-md bg-black/60 px-1.5 py-0.5 font-mono text-[11px] font-medium text-white backdrop-blur-sm">
-                {option.metric}
-              </span>
               <span
                 aria-hidden="true"
                 className={cn(
-                  "absolute end-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 transition-all duration-200",
-                  selected
-                    ? "scale-100 border-white bg-primary text-primary-foreground shadow-lg"
-                    : "scale-90 border-white/80 bg-black/25 text-transparent",
+                  "absolute end-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white",
+                  selected ? "bg-primary" : "bg-black/25",
                 )}
               >
-                <Check className="h-4 w-4" strokeWidth={3} />
+                <AnimatePresence>
+                  {selected && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 22 }}
+                    >
+                      <Check className="h-3.5 w-3.5 text-primary-foreground" strokeWidth={3} />
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </span>
             </div>
-            <div className={cn("flex flex-1 flex-col gap-1", large ? "p-3.5" : "p-2.5")}>
-              <span className={cn("font-semibold leading-tight", large ? "text-base" : "text-sm", selected && "text-primary")}>
+            <div className={cn("flex flex-1 flex-col gap-0.5", large ? "p-3" : "p-2")}>
+              <span className={cn("font-semibold leading-tight", large ? "text-sm sm:text-base" : "text-sm", selected && "text-primary")}>
                 {t(option.label)}
               </span>
-              {large && <span className="text-sm leading-snug text-muted-foreground">{t(option.caption)}</span>}
+              {large && <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{t(option.caption)}</span>}
             </div>
-          </button>
+          </motion.button>
         );
       })}
     </div>

@@ -1,4 +1,6 @@
+import { motion } from "framer-motion";
 import { ArrowLeft, Droplets, Users } from "lucide-react";
+import { InfoTip } from "@/components/InfoTip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +13,8 @@ import { OptionCardGroup } from "./OptionCardGroup";
 
 // CPHEEO norm for urban households with sewerage: 135 litres per person per day
 const LPCD = 135;
-const HOUSEHOLD_SIZES = [2, 4, 6, 8];
+const PEOPLE_PRESETS = [4, 10, 25, 50];
+const MAX_PEOPLE = 5000;
 interface DetailsStepProps {
   details: SiteDetails;
   onChange: (details: SiteDetails) => void;
@@ -26,6 +29,9 @@ export const DetailsStep = ({ details, onChange, roofArea, annualRainfall, onBac
   const units = useUnits();
   const { preferences } = useSettings();
   const set = <K extends keyof SiteDetails>(key: K, value: SiteDetails[K]) => onChange({ ...details, [key]: value });
+  // People are a shortcut for demand; typing litres directly clears the match
+  const people = details.water_demand > 0 && details.water_demand % LPCD === 0 ? details.water_demand / LPCD : null;
+  const setPeople = (count: number) => set("water_demand", Math.min(count * LPCD, MAX_DEMAND));
   const nameError = details.site_name.trim().length < 2;
 
   return (
@@ -95,49 +101,73 @@ export const DetailsStep = ({ details, onChange, roofArea, annualRainfall, onBac
           options={SOIL_TYPE_OPTIONS}
           value={details.soil_type}
           onChange={(value) => set("soil_type", value)}
-          className="lg:grid-cols-4"
         />
       </section>
 
-      <section className="glass-card space-y-3 rounded-2xl p-5">
+      <section className="glass-card space-y-4 rounded-2xl p-5">
         <SectionTitle icon="droplets" title={t("form.demand")} help={t("form.demandHelp")} />
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Input
-            id="water-demand"
-            type="number"
-            min={0}
-            max={MAX_DEMAND}
-            step={10}
-            inputMode="numeric"
-            aria-label={t("form.demand")}
-            value={Number.isFinite(details.water_demand) ? details.water_demand : 0}
-            onChange={(event) => {
-              const value = Number.parseFloat(event.target.value);
-              set("water_demand", Number.isFinite(value) ? Math.min(Math.max(value, 0), MAX_DEMAND) : 0);
-            }}
-            className="w-40"
-          />
+        <div className="space-y-2">
+          <Label className="flex items-center gap-1.5 text-sm font-medium">
+            <Users className="h-4 w-4 text-primary" />
+            {t("details.peopleOnSite")}
+          </Label>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Users className="h-4 w-4" />
-              {t("details.household")}
-            </span>
-            {HOUSEHOLD_SIZES.map((people) => (
-              <Button
-                key={people}
-                type="button"
-                size="sm"
-                variant={details.water_demand === people * LPCD ? "default" : "outline"}
-                onClick={() => set("water_demand", people * LPCD)}
-              >
-                {t("details.people", { count: people })}
-              </Button>
+            {PEOPLE_PRESETS.map((count) => (
+              <motion.div key={count} whileTap={{ scale: 0.94 }} whileHover={{ y: -1 }}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={people === count ? "default" : "outline"}
+                  onClick={() => setPeople(count)}
+                >
+                  {t("details.people", { count })}
+                </Button>
+              </motion.div>
             ))}
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={1}
+                max={MAX_PEOPLE}
+                step={1}
+                inputMode="numeric"
+                aria-label={t("details.customPeople")}
+                placeholder={t("details.customPeople")}
+                value={people && !PEOPLE_PRESETS.includes(people) ? people : ""}
+                onChange={(event) => {
+                  const value = Number.parseInt(event.target.value, 10);
+                  if (Number.isFinite(value) && value > 0) setPeople(Math.min(value, MAX_PEOPLE));
+                }}
+                className="h-9 w-36"
+              />
+            </div>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {details.water_demand === 0 ? t("details.zeroDemand") : t("details.lpcdNote", { lpcd: LPCD })}
-        </p>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Label htmlFor="water-demand" className="text-sm font-medium sm:min-w-44">
+            {t("details.litresPerDay")}
+          </Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="water-demand"
+              type="number"
+              min={0}
+              max={MAX_DEMAND}
+              step={10}
+              inputMode="numeric"
+              value={Number.isFinite(details.water_demand) ? details.water_demand : 0}
+              onChange={(event) => {
+                const value = Number.parseFloat(event.target.value);
+                set("water_demand", Number.isFinite(value) ? Math.min(Math.max(value, 0), MAX_DEMAND) : 0);
+              }}
+              className="w-40"
+            />
+            <span className="text-sm text-muted-foreground">L/day</span>
+            <InfoTip>{t("details.lpcdNote", { lpcd: LPCD })}</InfoTip>
+          </div>
+        </div>
+        {details.water_demand === 0 && <p className="text-xs text-muted-foreground">{t("details.zeroDemand")}</p>}
       </section>
 
       <p className="text-xs text-muted-foreground">{t("form.tariffNote", { tariff: preferences.waterTariff })}</p>
