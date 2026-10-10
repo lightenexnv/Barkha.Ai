@@ -1,6 +1,10 @@
 // API Configuration and Types for Barkha.AI
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+// Production builds default to the Render backend so a missing env var can't break the site
+export const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.PROD ? "https://barkha-ai-backend.onrender.com" : "http://localhost:8000")
+).replace(/\/+$/, "");
 
 // Types matching the backend models
 export interface SiteDetailsInput {

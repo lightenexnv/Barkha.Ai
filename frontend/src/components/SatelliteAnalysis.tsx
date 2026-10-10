@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Upload, Download, MapPin, Calculator, AlertTriangle, CheckCircle, Info, Navigation, Home } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, API_BASE_URL } from '@/lib/api';
 
 interface Coordinates {
   latitude: number;
@@ -687,7 +687,7 @@ const SatelliteAnalysis: React.FC = () => {
                         <h4 className="font-semibold text-sm">Red Marking Detection</h4>
                         <div className="border rounded-lg overflow-hidden">
                           <img 
-                            src={`http://localhost:8000/api/cv2-image/${analysisResult.cv2_images.red_mask_path}`}
+                            src={`${API_BASE_URL}/api/cv2-image/${analysisResult.cv2_images.red_mask_path}`}
                             alt="Red marking detection"
                             className="w-full h-auto"
                             onError={(e) => {
@@ -706,7 +706,7 @@ const SatelliteAnalysis: React.FC = () => {
                         <h4 className="font-semibold text-sm">Roof Contour Analysis</h4>
                         <div className="border rounded-lg overflow-hidden">
                           <img 
-                            src={`http://localhost:8000/api/cv2-image/${analysisResult.cv2_images.contour_analysis_path}`}
+                            src={`${API_BASE_URL}/api/cv2-image/${analysisResult.cv2_images.contour_analysis_path}`}
                             alt="Roof contour analysis"
                             className="w-full h-auto"
                             onError={(e) => {

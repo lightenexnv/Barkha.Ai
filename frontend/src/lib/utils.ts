@@ -2,13 +2,14 @@
 // src/lib/utils.ts
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { API_BASE_URL } from "./api"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 // src/lib/api.ts - API utilities for satellite analysis
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api';
+const API_BASE = `${API_BASE_URL}/api`;
 
 export interface ApiResponse<T> {
   success: boolean;
