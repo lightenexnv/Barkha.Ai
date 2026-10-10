@@ -35,8 +35,12 @@ const backendProxy = (pinned?: string): ProxyOptions => ({
   configure(proxy, options) {
     if (pinned) return;
     let current = "";
+    let misses = 0;
     const choose = async () => {
-      const next = (await isUp(LOCAL_BACKEND)) ? LOCAL_BACKEND : DEPLOYED_BACKEND;
+      // A busy local backend can miss one probe; only give up on it after
+      // three misses in a row so requests do not flap to the deployed one.
+      misses = (await isUp(LOCAL_BACKEND)) ? 0 : misses + 1;
+      const next = misses === 0 || (current === LOCAL_BACKEND && misses < 3) ? LOCAL_BACKEND : DEPLOYED_BACKEND;
       // http-proxy reads options.target on every request
       options.target = next;
       if (next !== current) {

@@ -632,7 +632,7 @@ export const SaralAssistant = () => {
                     setOpen(false);
                     navigate("/assess", { state: { saralPlan: plan } });
                   }}
-                  onShare={() => window.open(whatsappUrl(shareMessage(plan.input, plan.result, `🌧️ ${resultSpeech()}`)), "_blank", "noopener")}
+                  onShare={() => window.open(whatsappUrl(shareMessage(plan.input, plan.result, `*${resultSpeech()}*\n`)), "_blank", "noopener")}
                   onPdf={() => download({ site: plan.input, result: plan.result }, "pdf")}
                   onRestart={() => {
                     reset();

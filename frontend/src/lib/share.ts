@@ -137,7 +137,7 @@ export const shareMessage = (
   let customHeadline: string | undefined;
 
   if (headlineOrSender) {
-    if (headlineOrSender.startsWith("🌧️") || headlineOrSender.includes("\n")) {
+    if (headlineOrSender.includes("\n")) {
       customHeadline = headlineOrSender;
     } else if (!senderName) {
       senderName = headlineOrSender;
@@ -166,17 +166,17 @@ export const shareMessage = (
     : locationTag || "Rainwater Harvesting Plan";
 
   const lines = [
-    customHeadline ?? `*🌧️ Barkha.AI Rainwater Harvesting Plan*`,
-    `👤 *Prepared by:* ${senderName}`,
-    `📍 *Property:* ${siteDesc}`,
+    customHeadline?.trim() ?? `*Barkha.AI Rainwater Harvesting Plan*`,
+    `*Prepared by:* ${senderName}`,
+    `*Property:* ${siteDesc}`,
     "",
-    `💧 *Annual Harvest:* ${litres} L/year (~${tankers} tankers)`,
+    `*Annual Harvest:* ${litres} L/year (~${tankers} tankers)`,
     savings > 0
-      ? `💰 *Savings:* ${rupees(result.savings_analysis.monthly_savings)}/mo (Payback: ~${(total / savings).toFixed(0)} yrs)`
-      : `🌱 *Recharge:* Direct groundwater infiltration`,
-    `🏗️ *Est. Setup:* ${rupees(total)}`,
+      ? `*Savings:* ${rupees(result.savings_analysis.monthly_savings)}/mo (Payback: ~${(total / savings).toFixed(0)} yrs)`
+      : `*Recharge:* Direct groundwater infiltration`,
+    `*Est. Setup:* ${rupees(total)}`,
     "",
-    `🔗 *View Full Plan:*`,
+    `*View Full Plan:*`,
     shortLink,
   ];
 
