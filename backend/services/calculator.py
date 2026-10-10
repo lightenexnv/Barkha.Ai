@@ -41,6 +41,9 @@ TRENCH_DEPTH = 1.5
 TRENCH_MAX_LENGTH = 15.0
 TRENCH_POROSITY = 0.35
 MAX_RESIDENTIAL_TANK_M3 = 100.0
+TANK_COST_PER_M3 = 8500.0     # ₹, blended plastic-tank / RCC-sump build cost used for sizing
+TANK_PAYBACK_YEARS = 15
+HEAVY_RAIN_DAY_MM = 25        # a typical heavy monsoon day the tank should be able to catch       # extra tank capacity must pay for itself within this time
 MIN_RECHARGE_RATE = 2.0       # mm/hr below which recharge is not advised
 
 VALID_CODES = ("storage_only", "recharge_only", "hybrid", "storage_priority_hybrid", "not_feasible")
@@ -173,15 +176,26 @@ class RTRWHCalculator:
 
         # Grow the tank in 0.5 m³ steps while the extra capacity still earns its keep:
         # stop at 90% of what an unlimited tank could supply, or once another
-        # 0.5 m³ adds less than 2 m³/year (each m³ of tank should cycle ≥ 4 times a year)
+        # 0.5 m³ no longer pays for itself: the extra water it saves over
+        # TANK_PAYBACK_YEARS must cover its build cost. Sizing for the whole
+        # monsoon peak gives huge tanks that never pay back; water a sensibly
+        # sized tank cannot hold goes to recharge instead.
+        min_gain = 0.5 * TANK_COST_PER_M3 / (max(s.water_tariff, 1.0) * TANK_PAYBACK_YEARS)
         required = 0.5
         supplied = self._simulate(required, monthly_harvest, monthly_demand)["supplied"]
         while required < ceiling and supplied < 0.9 * best:
             gain = self._simulate(required + 0.5, monthly_harvest, monthly_demand)["supplied"] - supplied
-            if gain < 2.0:
+            if gain < min_gain:
                 break
             required += 0.5
             supplied += gain
+
+        # A monthly balance assumes rain is used as it arrives, so it under-sizes
+        # tanks where demand exceeds monthly inflow. Rain comes in bursts: hold
+        # at least one heavy-rain day (HEAVY_RAIN_DAY_MM) of runoff, but never
+        # more than two days of the site's own use.
+        storm_runoff = s.roof_area * HEAVY_RAIN_DAY_MM / 1000 * CONDITION_FACTORS[s.roof_condition] * ROOF_COEFFICIENTS[s.roof_material]
+        required = min(ceiling, max(required, min(storm_runoff, 2 * s.water_demand / 1000)))
 
         # Round up to a standard tank size
         standard = [1, 1.5, 2, 3, 5, 7.5, 10, 12.5, 15, 20, 25, 30, 40, 50, 60, 75, 100]
@@ -256,26 +270,26 @@ class RTRWHCalculator:
     def safety_checks(s: SiteInputs, storage: Dict[str, Any], recharge: Dict[str, Any]) -> List[str]:
         warnings = []
         if s.roof_material == "asbestos":
-            warnings.append("CRITICAL: Asbestos roof detected. Do not use harvested water for drinking or cooking; route it to recharge or non-potable uses only.")
+            warnings.append("IMPORTANT: Asbestos roof. Do not drink this water; use it for cleaning, toilets or the garden.")
         if s.roof_material == "thatched":
-            warnings.append("WARNING: Thatched roofs leach organic matter. Provide a sand-charcoal filter and use the water for non-potable purposes.")
+            warnings.append("NOTE: Thatched roofs make the water dirty. Use a good filter and do not drink it.")
         if s.roof_condition == "poor":
-            warnings.append("WARNING: Poor roof condition lowers yield by about 25%. Repair cracks and clean the catchment before installation.")
+            warnings.append("NOTE: Repair and clean the roof first. A roof in poor shape collects about a quarter less water.")
         if s.soil_type == "clay" and s.annual_rainfall > 1200:
-            warnings.append("WARNING: Clay soil with heavy rainfall may cause waterlogging around recharge structures; provide an overflow to the storm drain.")
+            warnings.append("NOTE: Clay soil with heavy rain can flood around the pit. Add an overflow pipe to the drain.")
         if not recharge["recharge_feasible"]:
-            warnings.append("WARNING: Soil infiltration is too low for effective recharge. Prioritise storage or consult a hydrogeologist about a recharge well.")
+            warnings.append("NOTE: Water soaks into this ground very slowly, so a tank works better than a pit here.")
         if storage["recommended_volume"] > 15:
-            warnings.append("WARNING: Tanks above 15 m³ need a structural design check, a lockable manhole and UV-stable construction.")
+            warnings.append("NOTE: Large tanks need an engineer's check, a strong base and a lockable lid.")
         if s.annual_rainfall < 400:
-            warnings.append("WARNING: Low annual rainfall; expect long dry spells and size demand expectations accordingly.")
+            warnings.append("NOTE: This area gets little rain, so expect long dry months.")
         warnings.extend([
-            "REQUIRED: Keep recharge pits at least 6 m from septic tanks, soak pits and building foundations.",
-            "REQUIRED: Install a first-flush diverter to discard the first, most contaminated runoff of every rain event.",
-            "REQUIRED: Provide an overflow from the tank and recharge structure to the storm drain.",
-            "RECOMMENDED: Test stored water for pH, turbidity and coliform bacteria before potable use.",
-            "RECOMMENDED: Use opaque, covered tanks with mosquito-proof mesh on every opening.",
-            "RECOMMENDED: Clean gutters, leaf screens and filters before and twice during the monsoon.",
+            "MUST: Keep pits at least 6 m away from septic tanks and building foundations.",
+            "MUST: Fit a first-flush pipe to throw away the first, dirtiest rain.",
+            "MUST: Give the tank and the pit an overflow pipe to the drain.",
+            "TIP: Get the water tested before you drink it.",
+            "TIP: Keep the tank covered and mosquito-proof.",
+            "TIP: Clean gutters and filters before the rains.",
         ])
         return warnings
 
@@ -318,7 +332,9 @@ class RTRWHCalculator:
         total = statement["total_cost"]
         payback_years = total / annual_savings if annual_savings > 0 else None
 
-        subsidies = find_subsidies(s.state, total, s.water_tariff, water_used)
+        recharge_cost = sum(row["amount"] for row in statement["materials"] + statement["additional"]
+                            if row.get("component") == "recharge") * (1 + statement["contingency_rate"])
+        subsidies = find_subsidies(s.state, total, s.water_tariff, water_used, recharge_cost)
 
         storage_req = {
             "required_volume": storage["required_volume"],

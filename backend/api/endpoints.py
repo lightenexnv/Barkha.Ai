@@ -136,7 +136,7 @@ async def get_assessments(skip: int = 0, limit: int = 100, db: Database = Depend
 
 @router.get("/assessments/{assessment_id}")
 async def get_assessment(assessment_id: str, db: Optional[Database] = Depends(get_optional_db)):
-    assessment = find_assessment(db, assessment_id)
+    assessment = await run_in_threadpool(find_assessment, db, assessment_id)
     if not assessment:
         raise HTTPException(status_code=404, detail="Assessment not found")
     return assessment.to_dict()
@@ -214,7 +214,8 @@ async def serve_report(assessment: Assessment, report_format: str) -> FileRespon
 
 
 async def _report_for_id(db: Optional[Database], assessment_id: str, report_format: str) -> FileResponse:
-    assessment = find_assessment(db, assessment_id)
+    # MongoDB calls are blocking; keep them off the event loop
+    assessment = await run_in_threadpool(find_assessment, db, assessment_id)
     if not assessment:
         raise HTTPException(
             status_code=404,

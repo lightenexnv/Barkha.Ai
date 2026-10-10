@@ -64,6 +64,8 @@ def score_options(s, h: Dict[str, Any], storage: Dict[str, Any], recharge: Dict[
 
 
 def _pct(value: float) -> str:
+    if 0 < value < 0.01:
+        return "under 1%"
     return f"{round(value * 100):d}%"
 
 
@@ -77,12 +79,22 @@ def _clamp(value: float) -> int:
 
 def _rating(score: int) -> str:
     if score >= 80:
-        return "Excellent match"
+        return "Great fit"
     if score >= 60:
-        return "Good match"
+        return "Good fit"
     if score >= 40:
-        return "Moderate match"
-    return "Poor match"
+        return "Okay fit"
+    return "Not a good fit"
+
+
+def _soak_speed(rate: float) -> str:
+    if rate >= 20:
+        return "quickly"
+    if rate >= 8:
+        return "well"
+    if rate >= 2:
+        return "slowly"
+    return "very slowly"
 
 
 def _financial(statement: Dict[str, Any]) -> Dict[str, Any]:
@@ -104,9 +116,9 @@ def _benefits(supplied: float, recharged: float, tariff: float) -> Dict[str, Any
         "annual_recharge_litres": round(recharged * 1000),
         "annual_bill_savings": round(supplied * tariff, 2),
         "summary": [
-            f"{_litres(supplied)} of municipal / tanker water replaced every year" if supplied > 0 else "No direct replacement of bought water",
-            f"{_litres(recharged)} returned to the aquifer every year" if recharged > 0 else "No groundwater recharge",
-            f"About ₹{round(supplied * tariff):,} saved on water bills each year" if supplied > 0 else "Benefit is groundwater security rather than bill savings",
+            f"{_litres(supplied)} of bought water replaced each year" if supplied > 0 else "Does not replace bought water",
+            f"{_litres(recharged)} sent back into the ground each year" if recharged > 0 else "No water sent into the ground",
+            f"About ₹{round(supplied * tariff):,} saved each year" if supplied > 0 else "Main benefit: more groundwater, not lower bills",
         ],
     }
 
@@ -135,15 +147,13 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
     scores = ctx["scores"]
     hybrid_trench = ctx["recharge_kind"] == "trench" if ctx["recharge_kind"] else scores["recharge_trench"] > scores["recharge_pit"]
 
-    site_line = (
-        f"Your {s.roof_area:,.0f} m² {s.roof_material} roof in {s.roof_condition} condition receives "
-        f"{s.annual_rainfall:,.0f} mm of rain a year and can yield about {harvestable:,.1f} m³ ({_litres(harvestable)})."
-    )
-    soil_line = f"The {soil} soil infiltrates about {rate:g} mm/hr."
+    site_line = f"Your {s.roof_area:,.0f} m² roof can collect about {_litres(harvestable)} of rain in a year."
+    soil_line = f"Water soaks into your {soil} soil {_soak_speed(rate)}."
     demand_line = (
-        f"Household demand is {s.water_demand:,.0f} L/day ({demand:,.1f} m³/year)."
-        if demand > 0 else "No daily water demand was entered, so stored water has no direct use."
+        f"The site uses about {s.water_demand:,.0f} litres a day."
+        if demand > 0 else "No daily water use was entered."
     )
+    share_used = water_used / demand if demand > 0 else 0.0
 
     dossiers: List[Dict[str, Any]] = []
 
@@ -152,21 +162,20 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
     storage_score = scores["storage"]
     dossiers.append({
         "id": "storage",
-        "title": "Rooftop Rainwater Storage System",
-        "description": "Roof runoff is collected by gutters and downpipes, the first dirty flush is diverted, and the rest passes through a filter into a covered tank for household use.",
-        "mechanism": "Gravity flow from roof to tank; a first-flush diverter discards the first ~1.5 mm of each storm, a sand-gravel-charcoal or mesh filter removes debris, and an overflow pipe protects the tank.",
+        "title": "Rainwater Storage Tank",
+        "description": "Rain from the roof is filtered and stored in a covered tank for daily use.",
+        "mechanism": "Pipes carry rain from the roof to the tank. The first dirty water is thrown away and a filter cleans the rest.",
         "justification": " ".join([
             site_line, demand_line,
-            f"A {tank:g} m³ tank meets about {_pct(coverage)} of annual demand based on a month-by-month water balance." if demand > 0 else "",
-            "Asbestos roofing makes the water unsuitable for drinking; use it only for flushing, washing and gardening." if s.roof_material == "asbestos" else "",
+            f"A {_litres(tank)} tank lets you use this rain, covering about {_pct(share_used)} of your yearly water use." if demand > 0 else "",
+            "Because the roof is asbestos, use this water for cleaning, toilets or the garden, not for drinking." if s.roof_material == "asbestos" else "",
         ]).strip(),
         "dimensions": [
-            {"label": "Tank capacity", "value": f"{tank:g} m³ ({_litres(tank)})"},
-            {"label": "Minimum capacity for 90% of achievable supply", "value": f"{storage['required_volume']:g} m³"},
-            {"label": "Days of demand held when full", "value": f"{storage['storage_days']} days"},
-            {"label": "Tank type", "value": "HDPE above-ground tank(s)" if tank <= 10 else "RCC underground sump"},
-            {"label": "Downpipes / first-flush units", "value": f"{max(1, -(-int(s.roof_area) // 100))}"},
-        ] if tank > 0 else [{"label": "Tank capacity", "value": "Not required (no demand entered)"}],
+            {"label": "Tank size", "value": f"{_litres(tank)}"},
+            {"label": "Days of water when full", "value": f"{storage['storage_days']} days"},
+            {"label": "Tank type", "value": "Plastic tank above ground" if tank <= 10 else "Concrete tank underground"},
+            {"label": "Rain pipes with first-flush", "value": f"{max(1, -(-int(s.roof_area) // 100))}"},
+        ] if tank > 0 else [{"label": "Tank size", "value": "Not needed (no daily use)"}],
         "bill_of_materials": [
             "Leaf screens / gutter mesh at every outlet",
             "First-flush diverter on each downpipe",
@@ -186,17 +195,17 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
         "financial": _financial(storage_statement),
         "benefits": _benefits(water_used, 0, tariff),
         "maintenance": [
-            "Clean roof, gutters and leaf screens before the monsoon and monthly during it.",
-            "Empty and reset the first-flush diverter after every rain event.",
-            "Wash the filter media every 2-3 months in the monsoon; replace charcoal yearly.",
-            "Drain, scrub and disinfect the tank once a year before the rains.",
+            "Clean the roof and gutters before the rains.",
+            "Empty the first-flush pipe after heavy rain.",
+            "Wash the filter every few months.",
+            "Clean the tank once a year.",
         ],
         "suitability": {
             "score": storage_score,
             "label": _rating(storage_score),
             "factors": [
-                f"Demand coverage {_pct(coverage)}" if demand > 0 else "No demand entered",
-                f"Runoff coefficient {h['effective_coefficient']:.2f}",
+                f"Covers {_pct(share_used)} of your water use" if demand > 0 else "No daily use entered",
+                f"{s.roof_material.title()} roof",
             ],
         },
     })
@@ -207,20 +216,18 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
     pit_recharge = harvestable * efficiency if recharge["recharge_feasible"] else 0
     dossiers.append({
         "id": "recharge_pit",
-        "title": "Groundwater Recharge Pit",
-        "description": "A circular pit filled with graded filter media that lets roof runoff soak into the ground and replenish the aquifer.",
-        "mechanism": "Runoff passes a silt chamber, then percolates through sand, gravel and boulder layers that filter it before it infiltrates through the pit base and walls.",
+        "title": "Recharge Pit",
+        "description": "A pit filled with stones and sand that lets roof rain soak into the ground.",
+        "mechanism": "Water passes a small silt tank, is filtered by sand and gravel, and soaks into the soil to refill the groundwater.",
         "justification": " ".join([
             site_line, soil_line,
-            f"Each pit is sized to hold and absorb one hour of a {40} mm/hr design storm ({recharge['design_runoff']:g} m³ of runoff)."
-            if recharge["recharge_feasible"] else "This infiltration rate is below the 2 mm/hr threshold for effective recharge, so a pit is not advised here.",
+            f"{pit['count']} pit(s) can take the water from a heavy downpour."
+            if recharge["recharge_feasible"] else "Water soaks in too slowly here for a pit to work well.",
         ]),
         "dimensions": [
             {"label": "Number of pits", "value": str(pit["count"])},
-            {"label": "Diameter", "value": f"{pit['diameter']:g} m"},
+            {"label": "Width", "value": f"{pit['diameter']:g} m"},
             {"label": "Depth", "value": f"{pit['depth']:g} m"},
-            {"label": "Filter volume per pit", "value": f"{pit['area'] * pit['depth']:.2f} m³"},
-            {"label": "Design storm runoff absorbed", "value": f"{recharge['design_runoff']:g} m³ per hour"},
         ],
         "bill_of_materials": [
             "Boulders 60-100 mm (bottom 50% of depth)",
@@ -240,14 +247,13 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
         "financial": _financial(pit_statement),
         "benefits": _benefits(0, pit_recharge, tariff),
         "maintenance": [
-            "Desilt the silt chamber before and after the monsoon.",
-            "Scrape and replace the top 5-10 cm of sand every year.",
-            "Keep the cover slab clear and the inlet screen free of leaves.",
+            "Clean the silt tank before and after the rains.",
+            "Replace the top layer of sand once a year.",
         ],
         "suitability": {
             "score": pit_score,
             "label": _rating(pit_score),
-            "factors": [f"Soil infiltration {rate:g} mm/hr", f"{pit['count']} pit(s) required"],
+            "factors": [f"Water soaks in {_soak_speed(rate)}", f"{pit['count']} pit(s) needed"],
         },
     })
 
@@ -257,20 +263,19 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
     trench_recharge = harvestable * efficiency if recharge["recharge_feasible"] else 0
     dossiers.append({
         "id": "recharge_trench",
-        "title": "Groundwater Recharge Trench",
-        "description": "A long, shallow trench filled with filter media and a perforated distribution pipe, suited to large roofs and less permeable or shallow soils.",
-        "mechanism": "A perforated pipe spreads runoff along the trench so it infiltrates over a large wetted area; geotextile keeps fine soil out of the media.",
+        "title": "Recharge Trench",
+        "description": "A long, narrow trench filled with stones that spreads roof rain into the ground. Good for big roofs or slow soil.",
+        "mechanism": "A pipe with holes spreads the water along the trench so it soaks into a large area of ground.",
         "justification": " ".join([
             site_line, soil_line,
-            "Its larger wetted area makes it better than a pit for slow soils and shallow water tables."
-            if s.soil_type in ("clay", "rocky") else "A pit achieves similar recharge on this soil with less excavation length.",
+            "It suits slow-draining ground better than a pit."
+            if s.soil_type in ("clay", "rocky") else "A pit would do the same job here with less digging.",
         ]),
         "dimensions": [
             {"label": "Number of trenches", "value": str(trench["count"])},
             {"label": "Length", "value": f"{trench['length']:g} m"},
             {"label": "Width", "value": f"{trench['width']:g} m"},
             {"label": "Depth", "value": f"{trench['depth']:g} m"},
-            {"label": "Filter volume", "value": f"{trench['length'] * trench['width'] * trench['depth'] * max(1, trench['count']):.2f} m³"},
         ],
         "bill_of_materials": [
             "Boulders, gravel and coarse sand in graded layers",
@@ -289,14 +294,13 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
         "financial": _financial(trench_statement),
         "benefits": _benefits(0, trench_recharge, tariff),
         "maintenance": [
-            "Desilt the inlet chamber before and after the monsoon.",
-            "Flush the perforated pipe annually.",
-            "Replace the top sand layer when ponding lasts more than a day.",
+            "Clean the silt tank before and after the rains.",
+            "Flush the pipe once a year.",
         ],
         "suitability": {
             "score": trench_score,
             "label": _rating(trench_score),
-            "factors": [f"Soil infiltration {rate:g} mm/hr", f"{trench['count']} trench(es) of {trench['length']:g} m"],
+            "factors": [f"Water soaks in {_soak_speed(rate)}", f"{trench['count']} trench(es) of {trench['length']:g} m"],
         },
     })
 
@@ -309,22 +313,22 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
     hybrid_score = scores["hybrid"]
     dossiers.append({
         "id": "hybrid",
-        "title": "Hybrid Storage + Recharge System",
-        "description": "A storage tank serves daily needs first; its overflow goes to a recharge structure so no harvested water is wasted.",
-        "mechanism": "Filtered runoff fills the tank; once it is full, the overflow pipe feeds the recharge pit or trench, which returns the surplus to the aquifer.",
+        "title": "Storage Tank + Recharge",
+        "description": "A tank stores rain for daily use. When it is full, the extra water goes into the ground instead of being wasted.",
+        "mechanism": "The tank fills first. Its overflow pipe leads to a recharge pit or trench.",
         "justification": " ".join([
             site_line, demand_line, soil_line,
-            f"About {_pct(surplus_share)} of the harvest ({surplus:,.1f} m³) would overflow a {tank:g} m³ tank; "
-            + ("routing it to recharge captures that surplus." if surplus_share >= 0.1 else "that surplus is small, so recharge adds little."),
+            (f"About {_pct(surplus_share)} of the rain would overflow the tank; sending it into the ground puts it to use."
+             if surplus_share >= 0.1 else "Only a little water would overflow, so the recharge part adds a small benefit."),
         ]),
         "dimensions": [
-            {"label": "Tank capacity", "value": f"{tank:g} m³ ({_litres(tank)})"},
-            {"label": "Recharge structure", "value": (
-                f"{trench['count']} trench(es), {trench['length']:g} × {trench['width']:g} × {trench['depth']:g} m"
+            {"label": "Tank size", "value": f"{_litres(tank)}"},
+            {"label": "Recharge part", "value": (
+                f"{trench['count']} trench(es), {trench['length']:g} m long"
                 if hybrid_trench else
-                f"{pit['count']} pit(s), {pit['diameter']:g} m Ø × {pit['depth']:g} m"
+                f"{pit['count']} pit(s), {pit['diameter']:g} m wide, {pit['depth']:g} m deep"
             )},
-            {"label": "Annual overflow to recharge", "value": f"{surplus:,.1f} m³"},
+            {"label": "Extra water sent into the ground", "value": f"{_litres(surplus)} a year"},
         ],
         "bill_of_materials": [
             "All storage-system components (screens, first-flush, filter, tank, fittings)",
@@ -340,13 +344,13 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
         "financial": _financial(hybrid_statement),
         "benefits": _benefits(water_used, hybrid_recharge, tariff),
         "maintenance": [
-            "Follow both storage and recharge maintenance schedules.",
-            "Check the overflow link stays clear before every monsoon.",
+            "Look after the tank and the pit as shown above.",
+            "Keep the overflow pipe clear before the rains.",
         ],
         "suitability": {
             "score": hybrid_score,
             "label": _rating(hybrid_score),
-            "factors": [f"Overflow share {_pct(surplus_share)}", f"Demand coverage {_pct(coverage)}" if demand > 0 else "No demand entered"],
+            "factors": [f"{_pct(surplus_share)} extra water to the ground", f"Covers {_pct(share_used)} of your water use" if demand > 0 else "No daily use entered"],
         },
     })
 

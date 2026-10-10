@@ -1,5 +1,6 @@
 import { AlertTriangle, CloudRain, ExternalLink, Loader2, MapPin, RefreshCw, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/InfoTip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
@@ -74,7 +75,17 @@ export const RainfallPanel = ({ climate, className }: { climate: LocationClimate
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">{t("climate.annual")}</p>
+          <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-primary">
+            {t("climate.annual")}
+            <InfoTip>
+              {t("climate.source")}{" "}
+              <a href={rainfall.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">
+                {rainfall.source}
+                <ExternalLink className="h-3 w-3" />
+              </a>
+              . {t("result.rainTip", { period: rainfall.period, source: "this record" }).split(". ").slice(1).join(". ")}
+            </InfoTip>
+          </p>
           <p className="text-3xl font-bold tabular-nums">
             {rainfall.annual.toLocaleString(locale)} <span className="text-lg font-semibold text-muted-foreground">mm</span>
           </p>
@@ -110,19 +121,6 @@ export const RainfallPanel = ({ climate, className }: { climate: LocationClimate
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {t("climate.source")}{" "}
-        <a
-          href={rainfall.sourceUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-0.5 font-medium text-primary underline-offset-2 hover:underline"
-        >
-          {rainfall.source}
-          <ExternalLink className="h-3 w-3" />
-        </a>
-        . {t("climate.sourceNote")}
-      </p>
     </div>
   );
 };

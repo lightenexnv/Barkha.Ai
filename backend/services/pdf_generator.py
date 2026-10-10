@@ -417,7 +417,7 @@ async def generate_assessment_pdf(assessment: Assessment) -> str:
         out = [Paragraph("6. Safety & Compliance", st.h2)]
         for check in checks:
             tag = check.split(":")[0].strip().upper()
-            colour = RED if "CRITICAL" in tag else AMBER if "WARNING" in tag else GREEN if "REQUIRED" in tag else MUTED
+            colour = RED if tag in ("IMPORTANT", "CRITICAL") else AMBER if tag in ("NOTE", "WARNING") else GREEN if tag in ("MUST", "REQUIRED") else MUTED
             out.append(Paragraph(clean(check), ParagraphStyle("Chk", parent=st.body, textColor=colour, spaceAfter=3)))
         return out
     _guard(story, st, "Safety", safety)

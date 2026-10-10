@@ -1,16 +1,18 @@
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { CheckCircle2, ChevronDown, CloudRain, LogIn, MapPin, RotateCcw, Ruler, Save, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, CloudRain, LogIn, MapPin, RotateCcw, Ruler, Save } from "lucide-react";
-import { Icon3D } from "@/components/Icon3D";
-import { DrawnIcon, type DrawnIconName } from "@/components/DrawnIcon";
+import { DrawnIcon } from "@/components/DrawnIcon";
+import { InfoTip } from "@/components/InfoTip";
 import { ReportDownloadMenu } from "@/components/ReportDownloadMenu";
 import { placeLine } from "@/components/assessment/model";
-import { DossierList } from "@/components/results/DossierList";
+import { Pressable } from "@/components/motion/Motion";
+import { fadeUp } from "@/components/motion/presets";
 import { FinancialStatement } from "@/components/results/FinancialStatement";
+import { HighlightCards } from "@/components/results/HighlightCards";
+import { RecommendationSection } from "@/components/results/RecommendationSection";
 import { SubsidyPanel } from "@/components/results/SubsidyPanel";
+import { defaultSelection, subsidyAmount, type SubsidySelection } from "@/components/results/subsidy";
 import { AssessmentResult as AssessmentResultType, SiteDetailsInput, formatCurrency } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -18,6 +20,7 @@ import { useUnits } from "@/context/SettingsContext";
 import { buildAssessmentEntry, saveAssessment, useAssessmentHistory } from "@/lib/historyService";
 import type { TranslationKey } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface AssessmentResultProps {
   result: AssessmentResultType;
@@ -34,42 +37,18 @@ const RECOMMENDATION_KEYS: Record<string, TranslationKey> = {
   not_feasible: "rec.not_feasible",
 };
 
-const COST_KEYS: Record<string, TranslationKey> = {
-  storage_tank_cost: "cost.storage_tank_cost",
-  recharge_structure_cost: "cost.recharge_structure_cost",
-  piping_cost: "cost.piping_cost",
-  filtration_cost: "cost.filtration_cost",
-  labor_cost: "cost.labor_cost",
-  material_contingency: "cost.material_contingency",
-  tax: "cost.tax",
-};
-
 export const getRecommendationColor = (recommendation: string) => {
   switch (recommendation) {
-    case 'hybrid':
-    case 'storage_priority_hybrid':
-      return 'success';
-    case 'storage_only':
-    case 'recharge_only':
-      return 'warning';
-    case 'not_feasible':
-      return 'destructive';
-    default:
-      return 'secondary';
-  }
-};
-
-const getRecommendationIcon = (recommendation: string): DrawnIconName => {
-  switch (recommendation) {
-    case 'hybrid':
-    case 'storage_priority_hybrid':
-    case 'storage_only':
-    case 'recharge_only':
-      return "tick";
-    case 'not_feasible':
-      return "cross";
-    default:
+    case "hybrid":
+    case "storage_priority_hybrid":
+      return "success";
+    case "storage_only":
+    case "recharge_only":
       return "warning";
+    case "not_feasible":
+      return "destructive";
+    default:
+      return "secondary";
   }
 };
 
@@ -80,14 +59,72 @@ export const useRecommendationLabel = () => {
     RECOMMENDATION_KEYS[recommendation] ? t(RECOMMENDATION_KEYS[recommendation]) : recommendation.replace(/_/g, " ");
 };
 
+/** Short, plain notes worth knowing; only the important ones are shown. */
+const GoodToKnow = ({ checks }: { checks: string[] }) => {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const important = checks.filter((check) => /^(IMPORTANT|NOTE|CRITICAL|WARNING)/.test(check));
+  const rest = checks.filter((check) => !important.includes(check));
+  if (!checks.length) return null;
+  const strip = (check: string) => check.replace(/^[A-Z]+:\s*/, "");
+
+  return (
+    <motion.section variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className="glass-card rounded-2xl">
+      <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex w-full items-center justify-between gap-3 p-5 text-start">
+        <span className="flex items-center gap-2.5">
+          <ShieldAlert className="h-5 w-5 text-warning" />
+          <span>
+            <span className="block font-semibold">{t("result.goodToKnow")}</span>
+            <span className="block text-sm text-muted-foreground">
+              {important.length ? t("result.goodToKnowCount", { count: important.length }) : t("result.goodToKnowNone")}
+            </span>
+          </span>
+        </span>
+        <motion.span animate={{ rotate: open ? 180 : 0 }} className="flex text-muted-foreground">
+          <ChevronDown className="h-5 w-5" />
+        </motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 260, damping: 30 }}
+            className="overflow-hidden"
+          >
+            <ul className="space-y-2 px-5 pb-5 text-sm" lang="en">
+              {[...important, ...rest].map((check) => (
+                <li
+                  key={check}
+                  className={cn(
+                    "rounded-lg border-s-4 px-3 py-2",
+                    /^(IMPORTANT|CRITICAL)/.test(check)
+                      ? "border-destructive bg-destructive/10"
+                      : /^(NOTE|WARNING)/.test(check)
+                        ? "border-warning bg-warning/10"
+                        : "border-primary/40 bg-muted/40",
+                  )}
+                >
+                  {strip(check)}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.section>
+  );
+};
+
 export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentResultProps) => {
   const { t } = useLanguage();
   const units = useUnits();
-  const recommendationLabel = useRecommendationLabel();
   const { user, openAuthModal } = useAuth();
   const { toast } = useToast();
   const history = useAssessmentHistory(user?.id);
   const isSaved = history.some((entry) => entry.id === result.assessment_id);
+  const [subsidy, setSubsidy] = useState<SubsidySelection>(() => defaultSelection(result.subsidies));
 
   const handleSave = () => {
     if (!user) return;
@@ -98,141 +135,92 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
     }
   };
 
-  const recommendationIcon = getRecommendationIcon(result.recommended_option);
-  const annualSavings = result.savings_analysis.annual_cost_savings;
   // Prefer the itemised statement total; older saved results only have cost_analysis
   const totalCost = result.financial_statement?.total_cost ?? result.cost_analysis.total_cost;
-  const payback =
-    result.payback_period && result.payback_period !== "N/A"
-      ? result.payback_period
-      : annualSavings > 0
-        ? Math.ceil(totalCost / annualSavings)
-        : "—";
+  const annualSavings = result.savings_analysis.annual_cost_savings;
+  const subsidyOff = subsidyAmount(subsidy, result.subsidies, totalCost);
+  const paybackYears = annualSavings > 0 ? totalCost / annualSavings : null;
+  const paybackAfterSubsidy = annualSavings > 0 && subsidyOff > 0 ? (totalCost - subsidyOff) / annualSavings : null;
   const place = placeLine({ city: input.city ?? "", district: input.district ?? "", state: input.state ?? "" });
   const rainfall = result.hydrology?.annual_rainfall ?? input.annual_rainfall;
-  const coverage = result.storage_recommendation.demand_coverage;
-  const hasDossiers = !!result.dossiers?.length;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-2">
-          <h1 className="text-3xl lg:text-4xl font-bold">
+      <motion.div initial="hidden" animate="show" variants={fadeUp} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold lg:text-4xl">
             {t("result.title1")} <span className="gradient-text">{t("result.title2")}</span>
           </h1>
-          <p className="text-muted-foreground">
-            {t("result.subtitle")}
-          </p>
+          <p className="text-muted-foreground">{t("result.subtitle")}</p>
         </div>
-
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={onNewAssessment}>
-            <RotateCcw className="h-4 w-4 me-2" />
-            {t("result.newAssessment")}
-          </Button>
+          <Pressable>
+            <Button variant="outline" onClick={onNewAssessment}>
+              <RotateCcw className="me-2 h-4 w-4" />
+              {t("result.newAssessment")}
+            </Button>
+          </Pressable>
           <ReportDownloadMenu data={{ site: input, result }} />
         </div>
-      </div>
+      </motion.div>
 
       {/* Account status */}
       <div
-        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${
-          isSaved ? "border-success/30 bg-success/10" : "border-primary/20 bg-primary/5"
-        }`}
+        className={cn(
+          "flex flex-col justify-between gap-3 rounded-lg border px-4 py-3 text-sm sm:flex-row sm:items-center",
+          isSaved ? "border-success/30 bg-success/10" : "border-primary/20 bg-primary/5",
+        )}
       >
         <div className="flex items-center gap-2">
-          {isSaved ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
-          ) : (
-            <DrawnIcon name="document" className="h-5 w-5 shrink-0 text-primary" />
-          )}
+          {isSaved ? <CheckCircle2 className="h-4 w-4 shrink-0 text-success" /> : <DrawnIcon name="document" className="h-5 w-5 shrink-0 text-primary" />}
           <span>{isSaved ? t("result.savedBanner") : user ? t("result.unsavedBanner") : t("result.guestBanner")}</span>
         </div>
         {!isSaved &&
           (user ? (
             <Button size="sm" variant="ocean" onClick={handleSave}>
-              <Save className="h-4 w-4 me-2" />
+              <Save className="me-2 h-4 w-4" />
               {t("result.saveToAccount")}
             </Button>
           ) : (
             <Button size="sm" variant="outline" onClick={openAuthModal}>
-              <LogIn className="h-4 w-4 me-2" />
+              <LogIn className="me-2 h-4 w-4" />
               {t("auth.signIn")}
             </Button>
           ))}
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Icon3D name="drop" className="h-9 w-9" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{t("result.harvestableVolume")}</p>
-                <p className="text-2xl font-bold">{units.volume(result.harvestable_volume)}</p>
-                <p className="text-xs text-success">{t("result.perYear")}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* 1. The key numbers */}
+      <HighlightCards
+        harvestM3={result.harvestable_volume}
+        monthlySavings={result.savings_analysis.monthly_savings}
+        annualSavings={annualSavings}
+        waterUsedM3={result.savings_analysis.annual_water_saved}
+        tariff={result.savings_analysis.water_tariff_used}
+        paybackYears={paybackYears}
+        paybackAfterSubsidy={paybackAfterSubsidy}
+      />
 
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                <Icon3D name="coins" className="h-9 w-9" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{t("result.annualSavings")}</p>
-                <p className="text-2xl font-bold">{formatCurrency(annualSavings)}</p>
-                <p className="text-xs text-success">{t("result.costReduction")}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg bg-warning/10 flex items-center justify-center">
-                <Icon3D name="calculator" className="h-9 w-9" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{t("result.implementationCost")}</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalCost)}</p>
-                <p className="text-xs text-muted-foreground">{t("result.oneTime")}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Site, rainfall and roof that produced these numbers */}
-      <div className="grid gap-4 rounded-2xl border border-border/60 bg-card/60 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      {/* 2. The site these numbers are for */}
+      <div className="grid gap-4 rounded-2xl border border-border/60 bg-card/60 p-4 text-sm sm:grid-cols-3">
         <div className="flex items-start gap-2">
           <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <div>
             <p className="text-xs text-muted-foreground">{t("result.site")}</p>
             <p className="font-medium">{input.site_name}</p>
-            <p className="text-xs text-muted-foreground">
-              {place || `${input.latitude.toFixed(4)}, ${input.longitude.toFixed(4)}`}
-            </p>
+            <p className="text-xs text-muted-foreground">{place || `${input.latitude.toFixed(4)}, ${input.longitude.toFixed(4)}`}</p>
           </div>
         </div>
         <div className="flex items-start gap-2">
           <CloudRain className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <div>
-            <p className="text-xs text-muted-foreground">{t("climate.annual")}</p>
+            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+              {t("climate.annual")}
+              {input.rainfall_source && (
+                <InfoTip>{t("result.rainTip", { period: input.rainfall_period ?? "", source: input.rainfall_source })}</InfoTip>
+              )}
+            </p>
             <p className="font-medium">{units.rainfall(rainfall)}</p>
-            {input.rainfall_period && (
-              <p className="text-xs text-muted-foreground" title={input.rainfall_source}>
-                {t("result.rainBasis", { period: input.rainfall_period })}
-              </p>
-            )}
           </div>
         </div>
         <div className="flex items-start gap-2">
@@ -241,255 +229,33 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
             <p className="text-xs text-muted-foreground">{t("result.roof")}</p>
             <p className="font-medium">{units.area(input.roof_area)}</p>
             <p className="text-xs text-muted-foreground">
-              {input.roof_polygon?.length ? t("result.roofMapped") : t("result.roofEntered")}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-start gap-2">
-          <DrawnIcon name="droplets" className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-          <div>
-            <p className="text-xs text-muted-foreground">{t("result.demandCoverage")}</p>
-            <p className="font-medium">
-              {input.water_demand > 0 && coverage !== undefined ? `${Math.round(coverage * 100)}%` : "—"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {input.water_demand > 0 ? t("result.demandPerDay", { litres: input.water_demand }) : t("details.zeroDemand")}
+              {t("result.usesPerDay", { litres: input.water_demand.toLocaleString("en-IN") })}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Recommendation */}
-      <Card className="glass-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DrawnIcon name={recommendationIcon} className="h-6 w-6 text-primary" />
-            <span>{t("result.recommendation")}</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center gap-4">
-            <Badge
-              variant={getRecommendationColor(result.recommended_option)}
-              className="text-sm px-4 py-2"
-            >
-              {recommendationLabel(result.recommended_option)}
-            </Badge>
-            <p className="text-muted-foreground">
-              {t("result.basedOn")}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* 3. What it costs */}
+      {result.financial_statement ? (
+        <FinancialStatement statement={result.financial_statement} />
+      ) : (
+        <div className="glass-card flex items-center justify-between rounded-2xl p-5">
+          <span className="font-semibold">{t("fin.total")}</span>
+          <span className="text-2xl font-bold text-primary">{formatCurrency(totalCost)}</span>
+        </div>
+      )}
 
-      {/* Detailed Analysis */}
-      <Tabs defaultValue={hasDossiers ? "dossiers" : "costs"} className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-2 md:grid-cols-4">
-          {hasDossiers && (
-            <TabsTrigger value="dossiers" className="whitespace-normal">{t("result.tabDossiers")}</TabsTrigger>
-          )}
-          <TabsTrigger value="costs" className="whitespace-normal">{t("result.tabFinancials")}</TabsTrigger>
-          <TabsTrigger value="technical" className="whitespace-normal">{t("result.tabTechnical")}</TabsTrigger>
-          <TabsTrigger value="safety" className="whitespace-normal">{t("result.tabSafety")}</TabsTrigger>
-        </TabsList>
+      {/* 4. Help with the cost */}
+      {result.subsidies && (
+        <SubsidyPanel subsidies={result.subsidies} grossCost={totalCost} selection={subsidy} onSelect={setSubsidy} />
+      )}
 
-        {hasDossiers && (
-          <TabsContent value="dossiers" className="space-y-4">
-            <p className="text-sm text-muted-foreground">{t("dossier.intro")}</p>
-            <DossierList dossiers={result.dossiers!} />
-          </TabsContent>
-        )}
+      <GoodToKnow checks={result.safety_checks} />
 
-        <TabsContent value="costs" className="space-y-6">
-          {result.financial_statement ? (
-            <>
-              <FinancialStatement statement={result.financial_statement} />
-              {result.subsidies && <SubsidyPanel subsidies={result.subsidies} />}
-              <SavingsSummary monthly={result.savings_analysis.monthly_savings} payback={payback} />
-            </>
-          ) : (
-            <>
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle>{t("result.costBreakdown")}</CardTitle>
-              <CardDescription>{t("result.costBreakdownDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(result.cost_analysis).map(([key, value]) => (
-                  key !== 'total_cost' && (
-                    <div key={key} className="flex justify-between items-center gap-4 py-2 border-b border-border/30">
-                      <span className="text-sm text-muted-foreground capitalize">
-                        {COST_KEYS[key] ? t(COST_KEYS[key]) : key.replace(/_/g, ' ')}
-                      </span>
-                      <span className="font-medium">{formatCurrency(value as number)}</span>
-                    </div>
-                  )
-                ))}
-                <div className="flex justify-between items-center gap-4 py-3 border-t-2 border-primary/20">
-                  <span className="text-lg font-semibold">{t("result.totalCost")}</span>
-                  <span className="text-lg font-bold text-primary">{formatCurrency(result.cost_analysis.total_cost)}</span>
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 bg-muted/30 rounded-lg">
-                <h4 className="font-medium mb-2">{t("result.savingsAnalysis")}</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <span>{t("result.monthlySavings")}</span>
-                    <span className="font-medium text-success">{formatCurrency(result.savings_analysis.monthly_savings)}</span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span>{t("result.paybackPeriod")}</span>
-                    <span className="font-medium">{t("result.years", { count: payback })}</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DrawnIcon name="document" className="h-5 w-5 text-primary" />
-                <span>{t("result.tabBoq")}</span>
-              </CardTitle>
-              <CardDescription>{t("result.boqDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border/50">
-                      <th className="text-start p-2 text-sm font-medium text-muted-foreground">{t("result.item")}</th>
-                      <th className="text-end p-2 text-sm font-medium text-muted-foreground">{t("result.quantity")}</th>
-                      <th className="text-end p-2 text-sm font-medium text-muted-foreground">{t("result.rate")}</th>
-                      <th className="text-end p-2 text-sm font-medium text-muted-foreground">{t("result.amount")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.bill_of_quantities.items.map((item, index) => (
-                      <tr key={index} className="border-b border-border/30">
-                        <td className="p-2 text-sm">{item.item}</td>
-                        <td className="p-2 text-sm text-end">{item.quantity}</td>
-                        <td className="p-2 text-sm text-end">{formatCurrency(item.rate)}</td>
-                        <td className="p-2 text-sm text-end font-medium">{formatCurrency(item.amount)}</td>
-                      </tr>
-                    ))}
-                    <tr className="border-t-2 border-primary/20">
-                      <td colSpan={3} className="p-2 text-end font-semibold">{t("result.total")}</td>
-                      <td className="p-2 text-end font-bold text-primary">{formatCurrency(result.bill_of_quantities.total_cost)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        
-            </>
-          )}
-        </TabsContent>
-
-        <TabsContent value="technical" className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Storage Requirements */}
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DrawnIcon name="barrel" className="h-5 w-5 text-primary" />
-                  <span>{t("result.storageSystem")}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">{t("result.requiredVolume")}</span>
-                    <span className="font-medium">{units.volume(result.storage_recommendation.required_volume)}</span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">{t("result.recommendedVolume")}</span>
-                    <span className="font-medium">{units.volume(result.storage_recommendation.recommended_volume)}</span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">{t("result.storageDuration")}</span>
-                    <span className="font-medium">{t("result.days", { count: result.storage_recommendation.storage_days })}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recharge System */}
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DrawnIcon name="drop" className="h-5 w-5 text-accent" />
-                  <span>{t("result.rechargeSystem")}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">{t("result.pitDiameter")}</span>
-                    <span className="font-medium">{units.length(result.recharge_recommendation.recharge_pit.diameter)}</span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">{t("result.pitDepth")}</span>
-                    <span className="font-medium">{units.length(result.recharge_recommendation.recharge_pit.depth)}</span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">{t("result.suitability")}</span>
-                    <span className="font-medium">{result.recharge_recommendation.suitability_score}</span>
-                  </div>
-                </div>
-                <Progress value={result.recharge_recommendation.suitability_score * 10} className="h-2" />
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="safety" className="space-y-6">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DrawnIcon name="warning" className="h-5 w-5 text-warning" />
-                <span>{t("result.safetyTitle")}</span>
-              </CardTitle>
-              <CardDescription>{t("result.safetyDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {result.safety_checks.map((check, index) => (
-                  <div key={index} className={`p-3 rounded-lg border-s-4 ${
-                    check.includes('CRITICAL')
-                      ? 'bg-destructive/10 border-destructive'
-                      : check.includes('WARNING')
-                      ? 'bg-warning/10 border-warning'
-                      : 'bg-primary/10 border-primary'
-                  }`}>
-                    <p className="text-sm" lang="en">{check}</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-};
-
-const SavingsSummary = ({ monthly, payback }: { monthly: number; payback: string | number }) => {
-  const { t } = useLanguage();
-  return (
-    <div className="grid gap-3 rounded-2xl border border-border/60 bg-muted/30 p-4 text-sm sm:grid-cols-2">
-      <div className="flex justify-between gap-4">
-        <span>{t("result.monthlySavings")}</span>
-        <span className="font-medium text-success">{formatCurrency(monthly)}</span>
-      </div>
-      <div className="flex justify-between gap-4">
-        <span>{t("result.paybackPeriod")}</span>
-        <span className="font-medium">{payback === "—" ? t("result.noPayback") : t("result.years", { count: payback })}</span>
-      </div>
+      {/* 5. The recommendation, last */}
+      {result.dossiers?.length ? (
+        <RecommendationSection dossiers={result.dossiers} />
+      ) : null}
     </div>
   );
 };

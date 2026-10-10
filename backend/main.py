@@ -1,3 +1,4 @@
+import time
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,16 +40,25 @@ def create_indexes():
     except Exception as e:
         logger.warning(f"Could not create MongoDB indexes: {e}")
 
+_db_status = {"checked": 0.0, "database": "unknown", "error": None}
+
+
 @app.get("/health")
-async def health_check():
-    database, error = "connected", None
-    try:
-        if mongo_client is None:
-            raise RuntimeError(mongo_error)
-        mongo_client.admin.command("ping")
-    except Exception as e:
-        database, error = "unreachable", str(e)[:300]
-    return {"status": "healthy", "database": database, "database_error": error, "timestamp": datetime.now()}
+def health_check():
+    # A plain (threadpool) handler: the MongoDB ping blocks for up to the
+    # server-selection timeout when the database is unreachable, and inside an
+    # async handler that would freeze every other request. The result is
+    # cached so frequent health checks do not each wait for it.
+    if time.monotonic() - _db_status["checked"] > 30:
+        database, error = "connected", None
+        try:
+            if mongo_client is None:
+                raise RuntimeError(mongo_error)
+            mongo_client.admin.command("ping")
+        except Exception as e:
+            database, error = "unreachable", str(e)[:300]
+        _db_status.update(checked=time.monotonic(), database=database, error=error)
+    return {"status": "healthy", "database": _db_status["database"], "database_error": _db_status["error"], "timestamp": datetime.now()}
 
 @app.get("/")
 async def root():

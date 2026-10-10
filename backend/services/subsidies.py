@@ -170,7 +170,14 @@ def state_code(state: Optional[str]) -> Optional[str]:
     return STATE_ALIASES.get(key)
 
 
-def find_subsidies(state: Optional[str], total_cost: float, water_tariff: float, annual_supply_m3: float) -> Dict[str, Any]:
+def find_subsidies(state: Optional[str], total_cost: float, water_tariff: float, annual_supply_m3: float,
+                   recharge_cost: float = 0.0) -> Dict[str, Any]:
+    """
+    Schemes for the state, each with an indicative amount it could take off
+    the project cost. Only open-to-all percentage grants are applied
+    automatically; schemes with eligibility conditions (e.g. MGNREGA, rural job
+    card holders only) are offered for the user to select.
+    """
     code = state_code(state)
     schemes = [dict(s) for s in STATE_SCHEMES.get(code or "", [])] + [dict(LOCAL_BODY_FALLBACK)] + [dict(s) for s in CENTRAL_SCHEMES]
 
@@ -181,11 +188,17 @@ def find_subsidies(state: Optional[str], total_cost: float, water_tariff: float,
             grant = total_cost * scheme["grant_rate"]
             if scheme.get("grant_cap"):
                 grant = min(grant, scheme["grant_cap"])
+        auto_apply = grant > 0
+        if scheme["id"] == "mgnrega" and recharge_cost > 0:
+            # MGNREGA bears the wage and material cost of the recharge structure
+            grant = min(recharge_cost, total_cost)
+            auto_apply = False
         scheme["indicative_grant"] = round(grant, 2)
+        scheme["deductible"] = grant > 0
         if scheme.get("bill_rebate"):
             # Rebate on the water bill for the water still bought from the utility
             scheme["indicative_annual_rebate_note"] = f"{int(scheme['bill_rebate'] * 100)}% off your water bill each year"
-        if grant > best_grant:
+        if auto_apply and grant > best_grant:
             best_grant, best_scheme = grant, scheme["id"]
 
     return {

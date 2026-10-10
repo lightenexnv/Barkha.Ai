@@ -7,10 +7,14 @@ import { componentTagger } from "lovable-tagger";
 const LOCAL_BACKEND = "http://127.0.0.1:8000";
 const DEPLOYED_BACKEND = "https://barkha-ai-backend.onrender.com";
 
-/** True when a backend answers /health on the given origin within the timeout. */
-const isUp = (origin: string, timeoutMs = 800) =>
+/**
+ * True when a backend answers on the origin. Probes "/" (no database work):
+ * /health pings MongoDB, which can take seconds when it is not running
+ * locally and would wrongly look like "no backend".
+ */
+const isUp = (origin: string, timeoutMs = 1500) =>
   new Promise<boolean>((resolve) => {
-    const req = http.get(`${origin}/health`, { timeout: timeoutMs }, (res) => {
+    const req = http.get(`${origin}/`, { timeout: timeoutMs }, (res) => {
       res.resume();
       resolve((res.statusCode ?? 500) < 500);
     });

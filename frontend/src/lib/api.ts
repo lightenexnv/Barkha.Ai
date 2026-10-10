@@ -141,6 +141,9 @@ export interface SubsidyScheme {
   grant_cap: number | null;
   applies_to: string;
   indicative_grant: number;
+  /** True when the scheme can take an amount off the project cost */
+  deductible?: boolean;
+  indicative_annual_rebate_note?: string;
 }
 
 export interface SubsidySummary {
