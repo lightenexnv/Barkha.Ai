@@ -274,7 +274,7 @@ export const HighlightCards = ({
             gradient="bg-blue-600"
             icon={<Droplets className="h-6 w-6 text-cyan-200" />}
             label="Water harvested till now"
-            value={`${dynamicStats.harvestedTillNowLitres.toLocaleString(locale)} L`}
+            value={`${(dynamicStats.harvestedTillNowM3 * 1000).toLocaleString(locale, { maximumFractionDigits: dynamicStats.harvestedTillNowM3 < 1 ? 1 : 0, minimumFractionDigits: dynamicStats.harvestedTillNowM3 < 1 ? 1 : 0 })} L`}
             sub={`${t(`live.since.${dynamicStats.elapsed.unit}`, { count: dynamicStats.elapsed.value })} · ${dynamicStats.harvestedTillNowM3.toFixed(2)} m³`}
             tip={t("live.sinceTip", { when: dynamicStats.startDate.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) })}
             tag="Live Tracking"
