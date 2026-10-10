@@ -85,12 +85,18 @@ def _generate_text_content(assessment: Assessment) -> str:
     content.append("SITE DETAILS")
     content.append("-" * 40)
     content.append(f"Site Name: {_text(assessment.site_name)}")
+    location = assessment_data.get('location') or {}
+    place = ", ".join(dict.fromkeys(p for p in (location.get('city'), location.get('district'), location.get('state')) if p))
+    if place:
+        content.append(f"Place: {place}")
     content.append(f"Location: {_num(assessment.latitude):.6f}, {_num(assessment.longitude):.6f}")
     content.append(f"Roof Area: {_num(assessment.roof_area):.2f} m²")
     content.append(f"Roof Material: {_text(assessment.roof_material).title()}")
     content.append(f"Roof Condition: {_text(assessment.roof_condition).title()}")
     content.append(f"Soil Type: {_text(assessment.soil_type).title()}")
-    content.append(f"Annual Rainfall: {_num(assessment.annual_rainfall):.2f} mm")
+    content.append(f"Annual Rainfall: {_num(assessment.annual_rainfall):.0f} mm")
+    if location.get('rainfall_period'):
+        content.append(f"Rainfall Basis: mean of {location.get('rainfall_period')} ({_text(location.get('rainfall_source'))})")
     content.append(f"Daily Water Demand: {_num(assessment.water_demand):.2f} L/day")
     content.append("")
 
@@ -136,8 +142,21 @@ def _generate_text_content(assessment: Assessment) -> str:
         content.append(f"Recommended Option: {recommended_option.replace('_', ' ').title()}")
         content.append("")
 
+        dossiers = [d for d in (assessment_data.get('dossiers') or []) if isinstance(d, dict)]
+        chosen = next((d for d in dossiers if d.get('recommended')), None)
+        if chosen:
+            content.extend(_dossier_lines(chosen))
+
+        statement = assessment_data.get('financial_statement') or {}
+        if statement:
+            content.extend(_statement_lines(statement))
+
+        subsidies = assessment_data.get('subsidies') or {}
+        if subsidies:
+            content.extend(_subsidy_lines(subsidies))
+
         cost_analysis = recommendations.get('cost_analysis') or recommendations.get('costs') or {}
-        if cost_analysis:
+        if cost_analysis and not statement:
             content.append("COST ANALYSIS")
             content.append("-" * 20)
             for label, key in (
@@ -175,7 +194,7 @@ def _generate_text_content(assessment: Assessment) -> str:
             content.append("")
 
         bill_of_quantities = recommendations.get('bill_of_quantities') or {}
-        if bill_of_quantities:
+        if bill_of_quantities and not statement:
             content.append("BILL OF QUANTITIES")
             content.append("-" * 20)
             for item in bill_of_quantities.get('items') or []:
@@ -191,3 +210,81 @@ def _generate_text_content(assessment: Assessment) -> str:
     content.append("=" * 80)
 
     return "\n".join(content)
+
+
+def _dossier_lines(dossier: dict) -> list:
+    suitability = dossier.get('suitability') or {}
+    lines = [
+        "RECOMMENDED SYSTEM DOSSIER",
+        "-" * 40,
+        f"{_text(dossier.get('title'))} (suitability {_text(suitability.get('score'), '0')}/100, {_text(suitability.get('label'))})",
+        "",
+        _text(dossier.get('description'), ''),
+        _text(dossier.get('mechanism'), ''),
+        "",
+        "Why this suits the site:",
+        _text(dossier.get('justification'), ''),
+        "",
+        "Dimensions & capacity:",
+    ]
+    lines += [f"  {_text(d.get('label'))}: {_text(d.get('value'))}" for d in dossier.get('dimensions') or []]
+    for title, key, numbered in (("Required materials", 'bill_of_materials', False),
+                                 ("Installation process", 'installation_steps', True),
+                                 ("Maintenance protocol", 'maintenance', False)):
+        items = dossier.get(key) or []
+        if items:
+            lines += ["", f"{title}:"]
+            lines += [f"  {i}. {item}" if numbered else f"  - {item}" for i, item in enumerate(items, 1)]
+    benefits = (dossier.get('benefits') or {}).get('summary') or []
+    if benefits:
+        lines += ["", "Quantified benefits:"] + [f"  - {b}" for b in benefits]
+    lines.append("")
+    return lines
+
+
+def _statement_lines(statement: dict) -> list:
+    def part(title: str, rows: list, subtotal_label: str, subtotal) -> list:
+        out = [title, f"{'S.No.':<6}{'Item':<52}{'Qty':>12}{'Unit price':>14}{'Amount':>14}"]
+        for r in rows:
+            qty = f"{_num(r.get('quantity')):g} {r.get('unit', '')}"
+            out.append(f"{_text(r.get('sno'), ''):<6}{_text(r.get('description'))[:50]:<52}{qty:>12}"
+                       f"{_num(r.get('unit_price')):>14,.0f}{_num(r.get('amount')):>14,.0f}")
+        out.append(f"{subtotal_label:<84}{_num(subtotal):>14,.0f}")
+        return out + [""]
+
+    lines = ["COST ESTIMATION STATEMENT (₹, indicative, GST inclusive)", "-" * 40]
+    lines += part("Part A - Materials & Supplies", statement.get('materials') or [], "Materials subtotal (A)",
+                  statement.get('materials_subtotal'))
+    lines += part("Part B - Additional Project Expenses", statement.get('additional') or [], "Additional costs subtotal (B)",
+                  statement.get('additional_subtotal'))
+    pct = round(_num(statement.get('contingency_rate')) * 100)
+    lines += [
+        "Part C - Estimated Gross Project Cost",
+        f"  Materials subtotal (A):            ₹{_num(statement.get('materials_subtotal')):,.0f}",
+        f"+ Additional costs subtotal (B):     ₹{_num(statement.get('additional_subtotal')):,.0f}",
+        f"+ Contingency allowance ({pct}%):      ₹{_num(statement.get('contingency')):,.0f}",
+        f"= TOTAL ESTIMATED PROJECT COST:      ₹{_num(statement.get('total_cost')):,.0f} (before subsidy)",
+        _text(statement.get('rates_note'), ''),
+        "",
+    ]
+    return lines
+
+
+def _subsidy_lines(subsidies: dict) -> list:
+    lines = ["GOVERNMENT SUBSIDY OPPORTUNITIES", "-" * 40]
+    for scheme in subsidies.get('schemes') or []:
+        lines.append(f"* {_text(scheme.get('name'))} - {_text(scheme.get('authority'))}")
+        lines.append(f"    Assistance: {_text(scheme.get('assistance'))}")
+        if _num(scheme.get('indicative_grant')) > 0:
+            lines.append(f"    Indicative grant for this project: up to ₹{_num(scheme.get('indicative_grant')):,.0f}")
+        lines.append(f"    Eligibility: {_text(scheme.get('eligibility'))}")
+        lines.append(f"    How to apply: {_text(scheme.get('how_to_apply'))} ({_text(scheme.get('portal'))})")
+    lines += [
+        "",
+        f"Total estimated project cost:         ₹{_num(subsidies.get('gross_cost')):,.0f}",
+        f"- Indicative subsidy:                 ₹{_num(subsidies.get('indicative_subsidy')):,.0f}",
+        f"= Indicative net cost (projection):   ₹{_num(subsidies.get('indicative_net_cost')):,.0f}",
+        f"DISCLAIMER: {_text(subsidies.get('disclaimer'), '')}",
+        "",
+    ]
+    return lines

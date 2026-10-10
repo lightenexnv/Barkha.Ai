@@ -149,15 +149,6 @@
     }
   }
 
-  @keyframes float {
-    0%, 100% {
-      transform: translateY(0px);
-    }
-    50% {
-      transform: translateY(-10px);
-    }
-  }
-
   @keyframes wave {
     0%, 100% {
       transform: rotate(0deg);
@@ -181,10 +172,6 @@
 
   .animate-ripple {
     animation: ripple 0.6s linear;
-  }
-
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
   }
 
   .animate-wave {
@@ -239,7 +226,6 @@
 
 /* Settings > "3D icon animations" off: stop decorative looping motion.
    Loading spinners (animate-spin) keep running. */
-.no-3d-motion .animate-float,
 .no-3d-motion .animate-ping,
 .no-3d-motion .animate-wave,
 .no-3d-motion .animate-shimmer,
@@ -249,4 +235,44 @@
 
 .no-3d-motion .animate-ping {
   display: none;
+}
+
+/* Satellite map: pin, editable outline corners, and controls above the overlay */
+.barkha-pin {
+  background: none;
+  border: 0;
+  filter: drop-shadow(0 4px 6px rgb(0 0 0 / 0.45));
+}
+
+.barkha-vertex {
+  background: none;
+  border: 0;
+}
+
+.barkha-vertex__dot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 3px solid #0277b8;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.5);
+  cursor: grab;
+  transition: transform 0.15s ease;
+}
+
+.barkha-vertex__dot:hover {
+  transform: scale(1.25);
+}
+
+.leaflet-dragging .barkha-vertex__dot {
+  cursor: grabbing;
+}
+
+.barkha-map .leaflet-control-attribution {
+  font-size: 10px;
+}
+
+.barkha-map .leaflet-control-zoom a {
+  color: #0b3b6e;
 }

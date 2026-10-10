@@ -2,10 +2,12 @@
 // coordinates: the painted backdrop (sky, water, title) and the 3D scene,
 // rendered off-screen.
 //
-// The look is a camera sitting just under a calm surface: the surface is a
-// thin, slowly rolling band seen almost edge-on, bright along its crest and
+// The look is a camera sitting just under a lively surface: the surface is a
+// rolling, choppy band seen almost edge-on, bright along its crest and
 // mirroring what is beneath it on its underside. Above it nothing bends;
-// below it the image sways gently, most strongly near the surface.
+// below it the image sways, most strongly near the surface. Every few
+// seconds a flash of light runs through the water and caustic ripples
+// shimmer just under the surface.
 
 export const waterVertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -37,16 +39,34 @@ export const waterFragmentShader = /* glsl */ `
     );
   }
 
-  // Slow, long swell along the surface, in CSS px (positive is up).
+  // Swell along the surface, in CSS px (positive is up): a long roll, a
+  // cross-running wave, short chop and gusts that come and go.
   float swell(float x, float t) {
-    return 2.4 * sin(x * 0.0105 + t * 0.55)
-         + 1.5 * sin(x * 0.0230 - t * 0.80 + 1.3)
-         + 0.7 * sin(x * 0.0470 + t * 1.25 + 4.0);
+    float gust = 0.75 + 0.25 * sin(t * 0.37) * sin(t * 0.23 + 1.7);
+    return gust * (
+             5.2 * sin(x * 0.0092 + t * 0.95)
+           + 3.4 * sin(x * 0.0210 - t * 1.45 + 1.3)
+           + 1.8 * sin(x * 0.0440 + t * 2.30 + 4.0)
+           + 0.9 * sin(x * 0.0910 - t * 3.40 + 0.6)
+           );
   }
 
   // Thickness of the edge-on surface band, in CSS px.
   float bandThickness(float x, float t) {
-    return 9.0 + 3.0 * sin(x * 0.017 - t * 0.6 + 2.0) + 1.5 * sin(x * 0.051 + t * 0.9);
+    return 10.0 + 4.5 * sin(x * 0.017 - t * 1.1 + 2.0) + 2.2 * sin(x * 0.051 + t * 1.7);
+  }
+
+  // A soft pulse of light every ~5.5 s (0..1), sharp attack, slow decay.
+  float flashPulse(float t) {
+    float phase = fract(t / 5.5);
+    return smoothstep(0.0, 0.04, phase) * exp(-phase * 9.0);
+  }
+
+  // Caustic-style ripple pattern: thin bright lines that drift and shimmer.
+  float caustics(vec2 p, float t) {
+    float a = sin(p.x * 0.050 + t * 1.6 + sin(p.y * 0.031 - t * 0.9) * 2.2);
+    float b = sin(p.y * 0.062 - t * 1.3 + sin(p.x * 0.027 + t * 0.7) * 2.0);
+    return pow(1.0 - abs(a * b), 10.0);
   }
 
   // How much of the 3D scene crosses the surface around x (0..1).
@@ -105,16 +125,17 @@ export const waterFragmentShader = /* glsl */ `
     } else {
       // Under water: content rides the swell and sways slowly. The sway is
       // strongest just under the surface and settles with depth.
-      float settle = mix(1.0, 0.35, smoothstep(0.0, 260.0, d));
-      float sway = sin(screenY * css.y * 0.030 - t * 0.9 + sin(x * 0.006 + t * 0.35) * 2.0);
-      shiftX = sway * 2.6 * settle;
+      float settle = mix(1.0, 0.3, smoothstep(0.0, 280.0, d));
+      float sway = sin(screenY * css.y * 0.030 - t * 1.5 + sin(x * 0.006 + t * 0.55) * 2.4)
+                 + 0.45 * sin(screenY * css.y * 0.071 + t * 2.3 + x * 0.004);
+      shiftX = sway * 3.6 * settle;
       sampleY = max(screenY + height * cssPx.y, uWaterline + cssPx.y)
-              + sin(x * 0.012 + t * 0.7) * 1.4 * settle * cssPx.y;
+              + sin(x * 0.012 + t * 1.2) * 2.4 * settle * cssPx.y;
     }
 
     float sampleX = (x + shiftX) / css.x;
     if (d >= 0.0 && d < band) {
-      sampleX += sin(x * 0.035 + t * 1.1 + d * 0.4) * 3.0 * cssPx.x;
+      sampleX += sin(x * 0.035 + t * 1.8 + d * 0.4) * 4.2 * cssPx.x;
     }
 
     vec2 uv = clamp(vec2(sampleX, 1.0 - sampleY), 0.001, 0.999);
@@ -130,13 +151,29 @@ export const waterFragmentShader = /* glsl */ `
       color *= 1.0 - 0.10 * exp(-pow((d - band) * 0.9, 2.0));
     }
 
-    // Bright crest: light skimming along the top of the surface.
-    float shimmer = 0.65 + 0.35 * sin(x * 0.021 - t * 0.9) * sin(x * 0.0073 + t * 0.4);
+    float flash = flashPulse(t);
+
+    // Bright crest: light skimming along the top of the surface, with glints
+    // racing along it in both directions.
+    float shimmer = 0.6 + 0.4 * sin(x * 0.021 - t * 1.6) * sin(x * 0.0073 + t * 0.7);
+    float span = css.x + 600.0;
+    float glintA = exp(-pow((x - (mod(t * 340.0, span) - 300.0)) / 70.0, 2.0));
+    float glintB = exp(-pow((x - (span - mod(t * 230.0 + 500.0, span) - 300.0)) / 55.0, 2.0));
     float crest = exp(-pow(d * 0.6, 2.0));
-    color = mix(color, vec3(1.0), crest * (0.55 + 0.25 * lift) * shimmer);
+    color = mix(color, vec3(1.0), crest * clamp((0.55 + 0.25 * lift) * shimmer + 0.6 * (glintA + glintB) + 0.5 * flash, 0.0, 1.0));
 
     // Light entering the water, fading over the first few dozen px.
-    color += below * 0.05 * exp(-max(d, 0.0) / 40.0);
+    color += below * (0.05 + 0.10 * flash) * exp(-max(d, 0.0) / 40.0);
+
+    // Caustic ripples under the surface, strongest near it and during a flash.
+    if (d > 0.0) {
+      float nearSurface = exp(-d / 150.0);
+      float ripple = caustics(vec2(x, d), t);
+      color += vec3(0.75, 0.95, 1.0) * ripple * nearSurface * (0.07 + 0.22 * flash) * (1.0 - sceneAlpha * 0.6);
+      // A sheet of light sweeping down through the water during the flash
+      float sweep = exp(-pow((d - fract(t / 5.5) * 900.0) / 90.0, 2.0));
+      color += vec3(0.8, 0.96, 1.0) * sweep * flash * 0.12;
+    }
 
     gl_FragColor = vec4(color, 1.0);
   }

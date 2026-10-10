@@ -55,12 +55,23 @@ const loadPreferences = (): Preferences => {
   // Only state, units and animations are user-facing. Engineering values stay at the
   // calibrated defaults (the tariff follows the state), ignoring any older saved overrides.
   const preset = STATE_PRESETS.find((option) => option.code === merged.regionState) ?? STATE_PRESETS[0];
+  const tariff = Number(merged.waterTariff);
+  const firstFlush = Number(merged.firstFlushMm);
+  // Validate each saved field so a stale or hand-edited entry can't break calculations
   return {
-    ...DEFAULT_PREFERENCES,
     regionState: preset.code,
-    waterTariff: preset.tariff,
-    units: merged.units,
-    animations: merged.animations,
+    waterTariff: Number.isFinite(tariff) && tariff > 0 && tariff <= 1000 ? tariff : preset.tariff,
+    units: merged.units === "imperial" ? "imperial" : "metric",
+    rainfallSource: (["open-meteo", "nasa-power", "manual"] as const).includes(merged.rainfallSource)
+      ? merged.rainfallSource
+      : DEFAULT_PREFERENCES.rainfallSource,
+    firstFlushMm:
+      Number.isFinite(firstFlush) && firstFlush >= 1 && firstFlush <= 2.5 ? firstFlush : DEFAULT_PREFERENCES.firstFlushMm,
+    defaultRoofMaterial: ROOF_MATERIALS.includes(merged.defaultRoofMaterial)
+      ? merged.defaultRoofMaterial
+      : DEFAULT_PREFERENCES.defaultRoofMaterial,
+    defaultSoilType: SOIL_TYPES.includes(merged.defaultSoilType) ? merged.defaultSoilType : DEFAULT_PREFERENCES.defaultSoilType,
+    animations: merged.animations !== false,
   };
 };
 

@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/BrandLogo";
 import { useState, type FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,7 @@ export const AuthModal = () => {
     >
       <DialogContent className="sm:max-w-md glass-card">
         <DialogHeader className="items-center text-center space-y-3">
-          <Icon3D name="logoDrops" className="h-14 w-14 animate-float" />
+          <BrandLogo variant="mark" markClassName="h-14 w-14" />
           <DialogTitle className="text-2xl">
             <span className="gradient-text">{t("auth.modalTitle")}</span>
           </DialogTitle>

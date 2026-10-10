@@ -12,7 +12,7 @@ import { LogIn, LogOut, Menu, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Icon3D } from "@/components/Icon3D";
 import { DrawnIcon, type DrawnIconName } from "@/components/DrawnIcon";
-import { BarkhaLogo } from "@/assets/logo";
+import { BrandLogo } from "@/components/BrandLogo";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { initialsOf, useAuth, type User } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -22,7 +22,6 @@ import type { TranslationKey } from "@/lib/i18n";
 const navigation: { label: TranslationKey; href: string; icon: DrawnIconName }[] = [
   { label: "nav.dashboard", href: "/", icon: "chart" },
   { label: "nav.newAssessment", href: "/assess", icon: "droplet" },
-  { label: "nav.satellite", href: "/satellite", icon: "satellite" },
   { label: "nav.settings", href: "/settings", icon: "cog" },
 ];
 
@@ -56,22 +55,8 @@ export const Header = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-3">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-            <div className="relative flex items-center">
-              <img
-                src={BarkhaLogo.mark}
-                alt="Barkha.Ai"
-                className="h-9 w-auto object-contain animate-float drop-shadow-sm"
-              />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xl font-bold tracking-tight text-foreground">
-                Barkha<span className="text-primary">.Ai</span>
-              </span>
-              <span className="text-[11px] font-medium text-muted-foreground leading-none">
-                Water Intelligence
-              </span>
-            </div>
+          <Link to="/" className="flex items-center transition-opacity hover:opacity-90" aria-label="Barkha.Ai home">
+            <BrandLogo tagline />
           </Link>
 
           {/* Desktop Navigation */}

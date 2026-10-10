@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/BrandLogo";
 import { type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTheme } from "next-themes";
@@ -262,7 +263,7 @@ const SettingsPage = () => {
         <div className="max-w-5xl mx-auto space-y-8">
           <div className="flex items-center gap-4">
             <div className="hidden sm:flex h-16 w-16 rounded-2xl bg-primary/10 items-center justify-center shadow-water">
-              <DrawnIcon name="cog" className="h-9 w-9 text-primary animate-float" />
+              <DrawnIcon name="cog" className="h-9 w-9 text-primary" />
             </div>
             <div className="space-y-1">
               <h1 className="text-3xl lg:text-4xl font-bold">
@@ -380,7 +381,7 @@ const SettingsPage = () => {
                     </div>
                   ) : (
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                      <Icon3D name="logoDrops" className="h-14 w-14 animate-float" />
+                      <BrandLogo variant="mark" markClassName="h-14 w-14" />
                       <div className="flex-1 space-y-1">
                         <p className="font-semibold">{t("settings.guestTitle")}</p>
                         <p className="text-sm text-muted-foreground">{t("settings.guestDesc")}</p>

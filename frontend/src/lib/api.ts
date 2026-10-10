@@ -21,6 +21,15 @@ export interface SiteDetailsInput {
   water_tariff?: number;
   /** First-flush diversion per rain event (mm); the backend defaults to 1.5 */
   first_flush_mm?: number;
+  /** Location-derived climate data, filled in automatically from the coordinates */
+  monthly_rainfall?: number[];
+  rainfall_source?: string;
+  rainfall_period?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  /** Roof outline from pin-to-roof detection, as [lat, lon] pairs */
+  roof_polygon?: [number, number][];
 }
 
 export interface AssessmentResult {
@@ -31,20 +40,17 @@ export interface AssessmentResult {
     required_volume: number;
     recommended_volume: number;
     storage_days: number;
+    annual_supply?: number;
+    demand_coverage?: number;
+    annual_demand?: number;
   };
   recharge_recommendation: {
-    recharge_pit: {
-      diameter: number;
-      depth: number;
-      area: number;
-    };
-    recharge_trench: {
-      length: number;
-      width: number;
-      depth: number;
-    };
+    recharge_pit: { diameter: number; depth: number; area: number; count?: number };
+    recharge_trench: { length: number; width: number; depth: number; count?: number };
     infiltration_rate: number;
     suitability_score: number;
+    design_runoff?: number;
+    recharge_feasible?: boolean;
   };
   cost_analysis: {
     storage_tank_cost: number;
@@ -58,6 +64,7 @@ export interface AssessmentResult {
   };
   savings_analysis: {
     annual_water_saved: number;
+    annual_recharge?: number;
     annual_cost_savings: number;
     monthly_savings: number;
     water_tariff_used: number;
@@ -72,8 +79,111 @@ export interface AssessmentResult {
     }>;
     total_cost: number;
   };
-  payback_period: string | null; // Added to match backend
+  payback_period: string | null;
   additional_info?: Record<string, unknown> | null;
+  // Present on results from the current engine; older saved results lack them
+  financial_statement?: FinancialStatement | null;
+  subsidies?: SubsidySummary | null;
+  dossiers?: Dossier[] | null;
+  hydrology?: Hydrology | null;
+}
+
+export interface StatementRow {
+  sno: number;
+  description: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  amount: number;
+  component: string;
+}
+
+export interface FinancialStatement {
+  materials: StatementRow[];
+  materials_subtotal: number;
+  additional: StatementRow[];
+  additional_subtotal: number;
+  contingency_rate: number;
+  contingency: number;
+  total_cost: number;
+  recharge_kind: string | null;
+  rates_note: string;
+}
+
+export interface SubsidyScheme {
+  id: string;
+  name: string;
+  authority: string;
+  level: string;
+  assistance: string;
+  eligibility: string;
+  how_to_apply: string;
+  portal: string;
+  grant_rate: number | null;
+  grant_cap: number | null;
+  applies_to: string;
+  indicative_grant: number;
+}
+
+export interface SubsidySummary {
+  state: string | null;
+  state_code: string | null;
+  schemes: SubsidyScheme[];
+  applied_scheme: string | null;
+  indicative_subsidy: number;
+  gross_cost: number;
+  indicative_net_cost: number;
+  disclaimer: string;
+}
+
+export interface Dossier {
+  id: string;
+  title: string;
+  description: string;
+  mechanism: string;
+  justification: string;
+  dimensions: { label: string; value: string }[];
+  bill_of_materials: string[];
+  installation_steps: string[];
+  financial: {
+    materials_subtotal: number;
+    additional_subtotal: number;
+    contingency: number;
+    total_cost: number;
+    breakdown: { label: string; amount: number }[];
+  };
+  benefits: {
+    annual_litres_saved: number;
+    annual_recharge_litres: number;
+    annual_bill_savings: number;
+    summary: string[];
+  };
+  maintenance: string[];
+  suitability: { score: number; label: string; factors: string[] };
+  recommended: boolean;
+}
+
+export interface Hydrology {
+  annual_rainfall: number;
+  monthly_rainfall: number[];
+  monthly_harvest: number[];
+  runoff_coefficient: number;
+  condition_factor: number;
+  first_flush_loss: number;
+  rain_events: number;
+  gross_rainfall_volume: number;
+  infiltration_rate: number;
+}
+
+export interface RoofDetection {
+  /** Outline as [lat, lon] pairs */
+  polygon: [number, number][];
+  area_m2: number;
+  confidence: number;
+  zoom: number;
+  metres_per_pixel: number;
+  method: string;
+  imagery: string;
 }
 
 export interface Assessment {
@@ -88,8 +198,8 @@ export interface Assessment {
   annual_rainfall: number;
   water_demand: number;
   site_photos?: string[];
-  assessment_data: any;
-  recommendations: any;
+  assessment_data: Record<string, unknown>;
+  recommendations: Record<string, unknown>;
   created_at: string;
   updated_at: string;
   is_synced: boolean;
@@ -121,7 +231,7 @@ class BarkhaAPI {
       }
       
       // For binary responses (e.g., PDF)
-      return response as any;
+      return response as unknown as T;
     } catch (error) {
       console.error('API Request failed:', error);
       throw error;
@@ -165,88 +275,22 @@ class BarkhaAPI {
     return this.request<{ status: string; timestamp: string }>('/health');
   }
 
-  // Satellite Analysis Methods
-  async getSatelliteImage(latitude: number, longitude: number): Promise<Blob> {
+  /** Segment the roof under a pinned point (pin-to-roof detection). */
+  async detectRoof(latitude: number, longitude: number, signal?: AbortSignal): Promise<RoofDetection> {
+    let response: Response;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/satellite-image/download/${latitude}/${longitude}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'image/png',
-        },
+      response = await fetch(`${API_BASE_URL}/api/detect-roof`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ latitude, longitude }),
+        signal,
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch satellite image: ${response.status} - ${errorText}`);
-      }
-
-      return await response.blob();
     } catch (error) {
-      console.error('Get satellite image failed:', error);
-      throw error;
+      if (error instanceof DOMException && error.name === 'AbortError') throw error;
+      throw new ApiError(0, error instanceof Error ? error.message : 'Network error');
     }
-  }
-
-  async analyzeRooftop(latitude: number, longitude: number, markedImage: File): Promise<any> {
-    const formData = new FormData();
-    formData.append('marked_image', markedImage);
-
-    return this.request<any>(`/api/analyze-rooftop?latitude=${latitude}&longitude=${longitude}`, {
-      method: 'POST',
-      body: formData,
-      headers: {}, // Remove Content-Type to let fetch set multipart/form-data boundary
-    });
-  }
-
-  async quickDimensionsAnalysis(latitude: number, longitude: number, markedImage: File): Promise<any> {
-    const formData = new FormData();
-    formData.append('marked_image', markedImage);
-
-    return this.request<any>(`/api/quick-dimensions?latitude=${latitude}&longitude=${longitude}`, {
-      method: 'POST',
-      body: formData,
-      headers: {}, // Remove Content-Type to let fetch set multipart/form-data boundary
-    });
-  }
-
-  async createAssessmentWithSatellite(siteData: SiteDetailsInput, markedImage?: File): Promise<AssessmentResult> {
-    const formData = new FormData();
-    formData.append('site_data', JSON.stringify(siteData));
-    if (markedImage) {
-      formData.append('marked_image', markedImage);
-    }
-
-    return this.request<AssessmentResult>('/api/assess-with-satellite', {
-      method: 'POST',
-      body: formData,
-      headers: {}, // Remove Content-Type to let fetch set multipart/form-data boundary
-    });
-  }
-
-  async downloadTemplateImage(latitude: number, longitude: number): Promise<Blob> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/template-image/download/${latitude}/${longitude}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'image/png',
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to download template: ${response.status} - ${errorText}`);
-      }
-
-      return await response.blob();
-    } catch (error) {
-      console.error('Download template failed:', error);
-      throw error;
-    }
-  }
-
-  // Test PDF download functionality
-  async testPdfDownload(): Promise<Blob> {
-    return (await this.fetchFile(`${API_BASE_URL}/api/test-pdf-download`, { method: 'GET' }, 'test_download.pdf')).blob;
+    if (!response.ok) throw new ApiError(response.status, await errorDetail(response));
+    return response.json();
   }
 
   /** Download a report the server generates from its stored copy of the assessment. */

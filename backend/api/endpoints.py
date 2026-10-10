@@ -1,5 +1,5 @@
 # app/api/endpoints.py
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File, Depends
 from fastapi.responses import FileResponse
 from pymongo.database import Database
 from typing import Any, List, Dict
@@ -41,13 +41,23 @@ def _cache_key(assessment_id: str) -> str:
     return f"assessment:{assessment_id}"
 
 
-def save_assessment(db: Optional[Database], assessment: Assessment) -> None:
+def save_assessment(db: Optional[Database], assessment: Assessment,
+                    background: Optional[BackgroundTasks] = None) -> None:
+    """Cache now (so reports work immediately); store in MongoDB after the response if possible."""
     try:
         redis_client.setex(_cache_key(assessment.id), ASSESSMENT_CACHE_TTL, json.dumps(assessment.to_doc(), default=str))
     except Exception as e:
         logger.warning(f"Could not cache assessment {assessment.id}: {e}")
     if db is None:
         return
+    if background is not None:
+        # An unreachable MongoDB can take seconds to time out; don't make the user wait for it
+        background.add_task(_store_assessment, db, assessment)
+    else:
+        _store_assessment(db, assessment)
+
+
+def _store_assessment(db: Database, assessment: Assessment) -> None:
     try:
         db.assessments.insert_one(assessment.to_doc())
     except Exception as e:
@@ -111,11 +121,12 @@ def build_assessment(site: Dict[str, Any], result: Dict[str, Any], assessment_id
 
 
 @router.post("/assess", response_model=AssessmentResult)
-async def create_assessment(site_data: SiteDetailsInput, db: Optional[Database] = Depends(get_optional_db)):
+async def create_assessment(site_data: SiteDetailsInput, background: BackgroundTasks,
+                            db: Optional[Database] = Depends(get_optional_db)):
     logging.info(f"Received site_data: {site_data.model_dump()}")
     result = run_assessment(site_data, site_data.roof_area)
     assessment = build_assessment(site_data.model_dump(), result)
-    save_assessment(db, assessment)
+    save_assessment(db, assessment, background)
     return AssessmentResult(assessment_id=assessment.id, **result)
 
 @router.get("/assessments")

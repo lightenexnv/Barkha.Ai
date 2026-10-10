@@ -4,7 +4,6 @@ import coins from "@/assets/icons/coins.png";
 import document from "@/assets/icons/document.png";
 import drop from "@/assets/icons/drop.png";
 import lightning from "@/assets/icons/lightning.png";
-import logoDrops from "@/assets/icons/logo-drops.png";
 import satellite from "@/assets/icons/satellite.png";
 
 // 3D icons from thiings.co (https://www.thiings.co), cropped to 96px PNGs.
@@ -15,7 +14,6 @@ const icons = {
   document,
   drop,
   lightning,
-  logoDrops,
   satellite,
 };
 

@@ -14,6 +14,8 @@ const DESKTOP_BREAKPOINT = 1024;
 // How far the island model (rain cloud to soil) reaches from its anchor,
 // as a fraction of its width.
 const ISLAND_REACH = { up: 0.6, down: 0.42, side: 0.52 };
+// How far below the waterline the island is anchored, as a fraction of its width.
+const ISLAND_SINK = 0.04;
 
 export interface HeroLayout {
   isDesktop: boolean;
@@ -26,8 +28,6 @@ export interface HeroLayout {
   waterline: number;
   /** Top of the HTML block (subtitle, buttons) under the title. */
   contentTop: number;
-  /** Top of the eyebrow badge above the title. */
-  badgeTop: number;
   /** Where the 3D island is anchored, in CSS px. */
   island: { x: number; y: number; width: number };
   /** Minimum hero height in CSS px. */
@@ -66,24 +66,27 @@ export function computeHeroLayout(width: number, viewportHeight: number): HeroLa
   if (isDesktop) {
     const minHeight = Math.max(680, viewportHeight - 64);
     const gutter = Math.max(32, (width - 1280) / 2 + 32);
-    const columnWidth = Math.min(600, width * 0.5 - gutter);
+    // A slightly narrower title column leaves air around the heading and room for the island
+    const columnWidth = Math.min(560, width * 0.46 - gutter);
 
     // Fit the widest word in the column, and the whole hero in the viewport.
     const fontSize = Math.min((columnWidth * 100) / widest, 132, (minHeight - 330) / 3.9);
     const lineHeight = fontSize * 0.96;
     const contentHeight = 250;
     const blockHeight = lineHeight * 4 + fontSize * 0.28 + 28 + contentHeight;
-    const titleTop = Math.max(84, (minHeight - blockHeight) / 2 + 20);
+    const titleTop = Math.max(96, (minHeight - blockHeight) / 2 + 28);
 
     const baselines = TITLE_LINES.map((_, i) => titleTop + lineHeight * i + fontSize * 0.8);
     // The surface cuts through the middle of "Harvesting".
     const waterline = baselines[2] - fontSize * 0.38;
     // Keep the island clear of the title and the rain cloud inside the hero.
-    const titleRight = gutter + columnWidth + 24;
+    // It sits slightly deeper in the water, which lets it grow without
+    // pushing the cloud out of the top of the hero.
+    const titleRight = gutter + columnWidth + 32;
     const islandWidth = Math.min(
-      700,
-      (width - gutter - titleRight) / (2 * ISLAND_REACH.side),
-      (waterline - 8) / (ISLAND_REACH.up + 0.06),
+      820,
+      (width - gutter * 0.75 - titleRight) / (2 * ISLAND_REACH.side),
+      (waterline - 8) / (ISLAND_REACH.up - ISLAND_SINK),
     );
 
     return {
@@ -94,11 +97,10 @@ export function computeHeroLayout(width: number, viewportHeight: number): HeroLa
       letterSpacing: -0.035 * fontSize,
       baselines,
       waterline,
-      contentTop: baselines[3] + fontSize * 0.28 + 28,
-      badgeTop: titleTop - 52,
+      contentTop: baselines[3] + fontSize * 0.28 + 32,
       island: {
-        x: (titleRight + width - gutter) / 2,
-        y: waterline - islandWidth * 0.06,
+        x: (titleRight + width - gutter * 0.75) / 2,
+        y: waterline + islandWidth * ISLAND_SINK,
         width: islandWidth,
       },
       minHeight,
@@ -108,12 +110,11 @@ export function computeHeroLayout(width: number, viewportHeight: number): HeroLa
   // Phone and tablet: island floats in the sky, title below it.
   const gutter = width < 640 ? 16 : 32;
   const columnWidth = width - gutter * 2;
-  const islandWidth = Math.min(columnWidth * 1.05, 520);
+  const islandWidth = Math.min(columnWidth * 1.12, 580);
   const islandY = 16 + islandWidth * ISLAND_REACH.up;
   const fontSize = Math.min((columnWidth * 100) / widest, 88);
   const lineHeight = fontSize * 0.96;
-  // Leave room for the badge between the island's soil and the title.
-  const titleTop = islandY + islandWidth * ISLAND_REACH.down + 60;
+  const titleTop = islandY + islandWidth * ISLAND_REACH.down + 40;
   const baselines = TITLE_LINES.map((_, i) => titleTop + lineHeight * i + fontSize * 0.8);
   const waterline = baselines[2] - fontSize * 0.38;
 
@@ -125,8 +126,7 @@ export function computeHeroLayout(width: number, viewportHeight: number): HeroLa
     letterSpacing: -0.035 * fontSize,
     baselines,
     waterline,
-    contentTop: baselines[3] + fontSize * 0.3 + 24,
-    badgeTop: titleTop - 44,
+    contentTop: baselines[3] + fontSize * 0.3 + 28,
     island: { x: width / 2, y: islandY, width: islandWidth },
     minHeight: 0,
   };

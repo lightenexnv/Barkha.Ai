@@ -68,6 +68,7 @@ class SiteInputs:
     water_demand: float            # litres per day
     water_tariff: float            # ₹ per m³
     monthly_rainfall: List[float]  # mm, 12 values summing to annual_rainfall
+    first_flush_mm: float = FIRST_FLUSH_MM
     state: str = ""
     district: str = ""
     city: str = ""
@@ -104,6 +105,8 @@ class RTRWHCalculator:
             water_demand=max(0.0, _num(site.get("water_demand"))),
             water_tariff=tariff if tariff > 0 else default_tariff,
             monthly_rainfall=monthly,
+            # Settings allow 1.0-2.5 mm; IS 15797 recommends 1-2 mm
+            first_flush_mm=_clamp(_num(site.get("first_flush_mm"), FIRST_FLUSH_MM) or FIRST_FLUSH_MM, 0.5, 3.0),
             state=str(site.get("state") or ""),
             district=str(site.get("district") or ""),
             city=str(site.get("city") or ""),
@@ -122,7 +125,7 @@ class RTRWHCalculator:
         gross = s.roof_area * s.annual_rainfall / 1000
         runoff = gross * effective
         events = self.rain_events(s.annual_rainfall)
-        first_flush = min(runoff, s.roof_area * FIRST_FLUSH_MM / 1000 * events)
+        first_flush = min(runoff, s.roof_area * s.first_flush_mm / 1000 * events)
         harvestable = max(0.0, runoff - first_flush)
 
         # Monthly harvest keeps the annual total exact
@@ -367,6 +370,7 @@ class RTRWHCalculator:
                 "runoff_coefficient": h["runoff_coefficient"],
                 "condition_factor": h["condition_factor"],
                 "first_flush_loss": round(h["first_flush_loss"], 2),
+                "first_flush_mm": s.first_flush_mm,
                 "rain_events": h["rain_events"],
                 "gross_rainfall_volume": round(h["gross_rainfall_volume"], 2),
                 "infiltration_rate": recharge["infiltration_rate"],

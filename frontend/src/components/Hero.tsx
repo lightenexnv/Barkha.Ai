@@ -3,7 +3,6 @@ import type { CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Satellite } from "lucide-react";
 import { Icon3D, type Icon3DName } from "@/components/Icon3D";
-import { DrawnIcon } from "@/components/DrawnIcon";
 import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-rainwater.png";
 import { computeHeroLayout, paintBackdrop } from "@/components/hero/heroLayout";
@@ -20,7 +19,7 @@ const features: { icon: Icon3DName; title: string; description: string }[] = [
   {
     icon: "satellite",
     title: "Satellite Analysis",
-    description: "Automated rooftop dimension calculation using satellite imagery",
+    description: "Pin your roof on a live satellite map and get its outline and area automatically",
   },
   {
     icon: "document",
@@ -195,16 +194,6 @@ export const Hero = () => {
         {layout && (
           <>
             <div
-              className={`absolute z-10 ${layout.isDesktop ? "" : "left-1/2 -translate-x-1/2"}`}
-              style={{ top: layout.badgeTop, left: layout.isDesktop ? layout.gutter : undefined }}
-            >
-              <div className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm font-medium text-primary shadow-soft backdrop-blur-md">
-                <DrawnIcon name="droplets" className="h-4 w-4 animate-float" />
-                <span>Professional Water Assessment Platform</span>
-              </div>
-            </div>
-
-            <div
               className={`relative z-10 pb-20 ${layout.isDesktop ? "" : "text-center"}`}
               style={{ paddingTop: layout.contentTop }}
             >
@@ -232,9 +221,9 @@ export const Hero = () => {
                     asChild
                     className="text-white hover:bg-white/20"
                   >
-                    <Link to="/satellite">
+                    <Link to="/assess">
                       <Satellite className="h-5 w-5" />
-                      Try Satellite Analysis
+                      Pin Your Roof on the Map
                     </Link>
                   </Button>
                 </div>

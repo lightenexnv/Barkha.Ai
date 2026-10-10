@@ -3,10 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, LogIn, RotateCcw, Save } from "lucide-react";
+import { CheckCircle2, CloudRain, LogIn, MapPin, RotateCcw, Ruler, Save } from "lucide-react";
 import { Icon3D } from "@/components/Icon3D";
 import { DrawnIcon, type DrawnIconName } from "@/components/DrawnIcon";
 import { ReportDownloadMenu } from "@/components/ReportDownloadMenu";
+import { placeLine } from "@/components/assessment/model";
+import { DossierList } from "@/components/results/DossierList";
+import { FinancialStatement } from "@/components/results/FinancialStatement";
+import { SubsidyPanel } from "@/components/results/SubsidyPanel";
 import { AssessmentResult as AssessmentResultType, SiteDetailsInput, formatCurrency } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -96,12 +100,18 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
 
   const recommendationIcon = getRecommendationIcon(result.recommended_option);
   const annualSavings = result.savings_analysis.annual_cost_savings;
+  // Prefer the itemised statement total; older saved results only have cost_analysis
+  const totalCost = result.financial_statement?.total_cost ?? result.cost_analysis.total_cost;
   const payback =
     result.payback_period && result.payback_period !== "N/A"
       ? result.payback_period
       : annualSavings > 0
-        ? Math.ceil(result.cost_analysis.total_cost / annualSavings)
+        ? Math.ceil(totalCost / annualSavings)
         : "—";
+  const place = placeLine({ city: input.city ?? "", district: input.district ?? "", state: input.state ?? "" });
+  const rainfall = result.hydrology?.annual_rainfall ?? input.annual_rainfall;
+  const coverage = result.storage_recommendation.demand_coverage;
+  const hasDossiers = !!result.dossiers?.length;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -193,12 +203,60 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t("result.implementationCost")}</p>
-                <p className="text-2xl font-bold">{formatCurrency(result.cost_analysis.total_cost)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(totalCost)}</p>
                 <p className="text-xs text-muted-foreground">{t("result.oneTime")}</p>
               </div>
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Site, rainfall and roof that produced these numbers */}
+      <div className="grid gap-4 rounded-2xl border border-border/60 bg-card/60 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex items-start gap-2">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div>
+            <p className="text-xs text-muted-foreground">{t("result.site")}</p>
+            <p className="font-medium">{input.site_name}</p>
+            <p className="text-xs text-muted-foreground">
+              {place || `${input.latitude.toFixed(4)}, ${input.longitude.toFixed(4)}`}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <CloudRain className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div>
+            <p className="text-xs text-muted-foreground">{t("climate.annual")}</p>
+            <p className="font-medium">{units.rainfall(rainfall)}</p>
+            {input.rainfall_period && (
+              <p className="text-xs text-muted-foreground" title={input.rainfall_source}>
+                {t("result.rainBasis", { period: input.rainfall_period })}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <Ruler className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div>
+            <p className="text-xs text-muted-foreground">{t("result.roof")}</p>
+            <p className="font-medium">{units.area(input.roof_area)}</p>
+            <p className="text-xs text-muted-foreground">
+              {input.roof_polygon?.length ? t("result.roofMapped") : t("result.roofEntered")}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <DrawnIcon name="droplets" className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div>
+            <p className="text-xs text-muted-foreground">{t("result.demandCoverage")}</p>
+            <p className="font-medium">
+              {input.water_demand > 0 && coverage !== undefined ? `${Math.round(coverage * 100)}%` : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {input.water_demand > 0 ? t("result.demandPerDay", { litres: input.water_demand }) : t("details.zeroDemand")}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Recommendation */}
@@ -225,13 +283,112 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
       </Card>
 
       {/* Detailed Analysis */}
-      <Tabs defaultValue="technical" className="space-y-6">
+      <Tabs defaultValue={hasDossiers ? "dossiers" : "costs"} className="space-y-6">
         <TabsList className="grid h-auto w-full grid-cols-2 md:grid-cols-4">
+          {hasDossiers && (
+            <TabsTrigger value="dossiers" className="whitespace-normal">{t("result.tabDossiers")}</TabsTrigger>
+          )}
+          <TabsTrigger value="costs" className="whitespace-normal">{t("result.tabFinancials")}</TabsTrigger>
           <TabsTrigger value="technical" className="whitespace-normal">{t("result.tabTechnical")}</TabsTrigger>
-          <TabsTrigger value="costs" className="whitespace-normal">{t("result.tabCosts")}</TabsTrigger>
-          <TabsTrigger value="boq" className="whitespace-normal">{t("result.tabBoq")}</TabsTrigger>
           <TabsTrigger value="safety" className="whitespace-normal">{t("result.tabSafety")}</TabsTrigger>
         </TabsList>
+
+        {hasDossiers && (
+          <TabsContent value="dossiers" className="space-y-4">
+            <p className="text-sm text-muted-foreground">{t("dossier.intro")}</p>
+            <DossierList dossiers={result.dossiers!} />
+          </TabsContent>
+        )}
+
+        <TabsContent value="costs" className="space-y-6">
+          {result.financial_statement ? (
+            <>
+              <FinancialStatement statement={result.financial_statement} />
+              {result.subsidies && <SubsidyPanel subsidies={result.subsidies} />}
+              <SavingsSummary monthly={result.savings_analysis.monthly_savings} payback={payback} />
+            </>
+          ) : (
+            <>
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>{t("result.costBreakdown")}</CardTitle>
+              <CardDescription>{t("result.costBreakdownDesc")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {Object.entries(result.cost_analysis).map(([key, value]) => (
+                  key !== 'total_cost' && (
+                    <div key={key} className="flex justify-between items-center gap-4 py-2 border-b border-border/30">
+                      <span className="text-sm text-muted-foreground capitalize">
+                        {COST_KEYS[key] ? t(COST_KEYS[key]) : key.replace(/_/g, ' ')}
+                      </span>
+                      <span className="font-medium">{formatCurrency(value as number)}</span>
+                    </div>
+                  )
+                ))}
+                <div className="flex justify-between items-center gap-4 py-3 border-t-2 border-primary/20">
+                  <span className="text-lg font-semibold">{t("result.totalCost")}</span>
+                  <span className="text-lg font-bold text-primary">{formatCurrency(result.cost_analysis.total_cost)}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-muted/30 rounded-lg">
+                <h4 className="font-medium mb-2">{t("result.savingsAnalysis")}</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span>{t("result.monthlySavings")}</span>
+                    <span className="font-medium text-success">{formatCurrency(result.savings_analysis.monthly_savings)}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span>{t("result.paybackPeriod")}</span>
+                    <span className="font-medium">{t("result.years", { count: payback })}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DrawnIcon name="document" className="h-5 w-5 text-primary" />
+                <span>{t("result.tabBoq")}</span>
+              </CardTitle>
+              <CardDescription>{t("result.boqDesc")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border/50">
+                      <th className="text-start p-2 text-sm font-medium text-muted-foreground">{t("result.item")}</th>
+                      <th className="text-end p-2 text-sm font-medium text-muted-foreground">{t("result.quantity")}</th>
+                      <th className="text-end p-2 text-sm font-medium text-muted-foreground">{t("result.rate")}</th>
+                      <th className="text-end p-2 text-sm font-medium text-muted-foreground">{t("result.amount")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.bill_of_quantities.items.map((item, index) => (
+                      <tr key={index} className="border-b border-border/30">
+                        <td className="p-2 text-sm">{item.item}</td>
+                        <td className="p-2 text-sm text-end">{item.quantity}</td>
+                        <td className="p-2 text-sm text-end">{formatCurrency(item.rate)}</td>
+                        <td className="p-2 text-sm text-end font-medium">{formatCurrency(item.amount)}</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 border-primary/20">
+                      <td colSpan={3} className="p-2 text-end font-semibold">{t("result.total")}</td>
+                      <td className="p-2 text-end font-bold text-primary">{formatCurrency(result.bill_of_quantities.total_cost)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        
+            </>
+          )}
+        </TabsContent>
 
         <TabsContent value="technical" className="space-y-6">
           <div className="grid md:grid-cols-2 gap-6">
@@ -290,87 +447,6 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
           </div>
         </TabsContent>
 
-        <TabsContent value="costs" className="space-y-6">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle>{t("result.costBreakdown")}</CardTitle>
-              <CardDescription>{t("result.costBreakdownDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(result.cost_analysis).map(([key, value]) => (
-                  key !== 'total_cost' && (
-                    <div key={key} className="flex justify-between items-center gap-4 py-2 border-b border-border/30">
-                      <span className="text-sm text-muted-foreground capitalize">
-                        {COST_KEYS[key] ? t(COST_KEYS[key]) : key.replace(/_/g, ' ')}
-                      </span>
-                      <span className="font-medium">{formatCurrency(value as number)}</span>
-                    </div>
-                  )
-                ))}
-                <div className="flex justify-between items-center gap-4 py-3 border-t-2 border-primary/20">
-                  <span className="text-lg font-semibold">{t("result.totalCost")}</span>
-                  <span className="text-lg font-bold text-primary">{formatCurrency(result.cost_analysis.total_cost)}</span>
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 bg-muted/30 rounded-lg">
-                <h4 className="font-medium mb-2">{t("result.savingsAnalysis")}</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <span>{t("result.monthlySavings")}</span>
-                    <span className="font-medium text-success">{formatCurrency(result.savings_analysis.monthly_savings)}</span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span>{t("result.paybackPeriod")}</span>
-                    <span className="font-medium">{t("result.years", { count: payback })}</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="boq" className="space-y-6">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DrawnIcon name="document" className="h-5 w-5 text-primary" />
-                <span>{t("result.tabBoq")}</span>
-              </CardTitle>
-              <CardDescription>{t("result.boqDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border/50">
-                      <th className="text-start p-2 text-sm font-medium text-muted-foreground">{t("result.item")}</th>
-                      <th className="text-end p-2 text-sm font-medium text-muted-foreground">{t("result.quantity")}</th>
-                      <th className="text-end p-2 text-sm font-medium text-muted-foreground">{t("result.rate")}</th>
-                      <th className="text-end p-2 text-sm font-medium text-muted-foreground">{t("result.amount")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.bill_of_quantities.items.map((item, index) => (
-                      <tr key={index} className="border-b border-border/30">
-                        <td className="p-2 text-sm">{item.item}</td>
-                        <td className="p-2 text-sm text-end">{item.quantity}</td>
-                        <td className="p-2 text-sm text-end">{formatCurrency(item.rate)}</td>
-                        <td className="p-2 text-sm text-end font-medium">{formatCurrency(item.amount)}</td>
-                      </tr>
-                    ))}
-                    <tr className="border-t-2 border-primary/20">
-                      <td colSpan={3} className="p-2 text-end font-semibold">{t("result.total")}</td>
-                      <td className="p-2 text-end font-bold text-primary">{formatCurrency(result.bill_of_quantities.total_cost)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="safety" className="space-y-6">
           <Card className="glass-card">
             <CardHeader>
@@ -398,6 +474,22 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+};
+
+const SavingsSummary = ({ monthly, payback }: { monthly: number; payback: string | number }) => {
+  const { t } = useLanguage();
+  return (
+    <div className="grid gap-3 rounded-2xl border border-border/60 bg-muted/30 p-4 text-sm sm:grid-cols-2">
+      <div className="flex justify-between gap-4">
+        <span>{t("result.monthlySavings")}</span>
+        <span className="font-medium text-success">{formatCurrency(monthly)}</span>
+      </div>
+      <div className="flex justify-between gap-4">
+        <span>{t("result.paybackPeriod")}</span>
+        <span className="font-medium">{payback === "—" ? t("result.noPayback") : t("result.years", { count: payback })}</span>
+      </div>
     </div>
   );
 };
