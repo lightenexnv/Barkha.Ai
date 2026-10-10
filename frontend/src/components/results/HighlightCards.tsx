@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { CalendarClock, Droplets, PiggyBank } from "lucide-react";
 import { InfoTip } from "@/components/InfoTip";
 import { fadeUp, stagger } from "@/components/motion/presets";
@@ -25,6 +25,7 @@ const Card = ({
   value,
   sub,
   tip,
+  tag,
 }: {
   gradient: string;
   icon: React.ReactNode;
@@ -32,6 +33,8 @@ const Card = ({
   value: string;
   sub: string;
   tip: string;
+  /** Small pill next to the label, e.g. "with subsidy" */
+  tag?: string | null;
 }) => (
   <motion.div
     variants={fadeUp}
@@ -44,7 +47,23 @@ const Card = ({
       <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">{icon}</span>
       <InfoTip className="text-white/80 hover:bg-white/20 hover:text-white">{tip}</InfoTip>
     </div>
-    <p className="relative mt-4 text-sm font-medium text-white/85">{label}</p>
+    <p className="relative mt-4 flex flex-wrap items-center gap-2 text-sm font-medium text-white/85">
+      {label}
+      <AnimatePresence>
+        {tag && (
+          <motion.span
+            key={tag}
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.6 }}
+            transition={{ type: "spring", stiffness: 420, damping: 24 }}
+            className="rounded-full bg-white/25 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white ring-1 ring-white/40 backdrop-blur-sm"
+          >
+            {tag}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </p>
     <motion.p
       key={value}
       initial={{ opacity: 0, y: 8 }}
@@ -109,6 +128,7 @@ export const HighlightCards = ({
               : t("highlight.paybackSub")
         }
         tip={t(subsidised ? "highlight.paybackTipSubsidy" : "highlight.paybackTip")}
+        tag={subsidised ? t("highlight.withSubsidy") : null}
       />
     </motion.div>
   );
