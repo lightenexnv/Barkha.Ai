@@ -131,6 +131,18 @@ export const searchPlaces = async (query: string, signal?: AbortSignal): Promise
     .filter((item) => isValidCoordinate(item.latitude, item.longitude));
 };
 
+/** One place in India for a short name, or null (a single search request). */
+export const findPlaceInIndia = async (query: string, signal?: AbortSignal): Promise<SearchResult | null> => {
+  const data = await fetchJson<{ display_name: string; lat: string; lon: string }[]>(
+    `${NOMINATIM}/search?format=jsonv2&limit=1&accept-language=en&countrycodes=in&q=${encodeURIComponent(query)}`,
+    signal,
+  );
+  const hit = data[0];
+  if (!hit) return null;
+  const result = { label: hit.display_name, latitude: Number(hit.lat), longitude: Number(hit.lon) };
+  return isValidCoordinate(result.latitude, result.longitude) ? result : null;
+};
+
 /** Ten-year mean annual and monthly rainfall at a point. */
 export const fetchRainfall = async (latitude: number, longitude: number, signal?: AbortSignal): Promise<Rainfall> => {
   // ERA5 cells are ~25 km across, so nearby points share a result

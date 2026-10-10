@@ -38,7 +38,7 @@ export const WorkflowStepper = ({ steps, current, reachable, completed, onSelect
         {/* Track and animated fill between the first and last circle */}
         <div aria-hidden="true" className="absolute top-[18px] h-1 rounded-full bg-border" style={{ insetInlineStart: edge, insetInlineEnd: edge }}>
           <motion.div
-            className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
+            className="h-full rounded-full bg-primary"
             initial={false}
             animate={{ width: `${fill}%` }}
             transition={{ type: "spring", stiffness: 120, damping: 22 }}

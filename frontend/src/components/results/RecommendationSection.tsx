@@ -125,7 +125,7 @@ export const RecommendationSection = ({ dossiers }: { dossiers: Dossier[] }) => 
       </h2>
 
       {best ? (
-        <div className="relative overflow-hidden rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/10 via-card to-accent/10 p-5 shadow-[0_12px_40px_-16px_hsl(var(--primary)/0.5)] sm:p-6">
+        <div className="relative overflow-hidden rounded-2xl border-2 border-primary/40 bg-primary/5 p-5 shadow-[0_12px_40px_-16px_hsl(var(--primary)/0.5)] sm:p-6">
           <div className="flex flex-wrap items-start gap-4">
             <ScoreRing score={best.suitability.score} />
             <div className="min-w-0 flex-1 space-y-1">

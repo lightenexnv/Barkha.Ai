@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export const UserAvatar = ({ user, className = "h-9 w-9 text-sm" }: { user: User; className?: string }) => (
   <span
-    className={`inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-ocean font-semibold text-white shadow-water ${className}`}
+    className={`inline-flex shrink-0 items-center justify-center rounded-full bg-primary font-semibold text-white shadow-water ${className}`}
     aria-hidden="true"
   >
     {initialsOf(user.name)}

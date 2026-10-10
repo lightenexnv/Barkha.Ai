@@ -105,7 +105,7 @@ export const FinancialStatement = ({ statement }: { statement: Statement }) => {
           </dt>
           <dd className="tabular-nums">{formatCurrency(statement.contingency)}</dd>
         </div>
-        <div className="flex flex-wrap items-baseline justify-between gap-2 bg-gradient-to-r from-primary/10 to-accent/10 p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 bg-primary/10 p-4">
           <dt className="text-base font-semibold">
             {t("fin.total")}
             <span className="block text-xs font-normal text-muted-foreground">{t("fin.beforeSubsidy")}</span>

@@ -105,7 +105,7 @@ export const readPlanLink = (value: string): (SiteDetailsInput & { shared_by?: s
         water_demand: data.water_demand ?? 0,
         water_tariff: data.water_tariff ?? 50,
         first_flush_mm: data.first_flush_mm ?? 1.5,
-        shared_by: (data as any).shared_by || "Neil Verma",
+        shared_by: (data as { shared_by?: string }).shared_by || "Neil Verma",
         ...data,
       } as SiteDetailsInput & { shared_by?: string };
     }
@@ -151,7 +151,9 @@ export const shareMessage = (
         const u = JSON.parse(stored);
         if (u?.name) senderName = u.name;
       }
-    } catch {}
+    } catch {
+      // No stored profile; fall back to the default sender below
+    }
   }
 
   // Default to Neil Verma

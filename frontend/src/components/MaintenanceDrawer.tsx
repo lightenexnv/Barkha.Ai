@@ -313,7 +313,7 @@ export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpe
               </section>
 
               {/* Service booking card */}
-              <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-cyan-500/10 p-5">
+              <div className="rounded-2xl border border-primary/20 bg-primary/10 p-5">
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
                     <CalendarCheck className="h-5 w-5" />

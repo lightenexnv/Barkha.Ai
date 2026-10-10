@@ -145,7 +145,7 @@ export const MonsoonLive = ({ input, result }: { input: SiteDetailsInput; result
                   </span>
                   <div className="flex h-24 w-full items-end overflow-hidden rounded-lg bg-muted/50">
                     <motion.div
-                      className={cn("w-full rounded-lg bg-gradient-to-t", heavy ? "from-blue-700 to-sky-400" : "from-sky-500 to-cyan-300")}
+                      className={cn("w-full rounded-lg", heavy ? "bg-blue-700" : "bg-sky-500")}
                       initial={{ height: 0 }}
                       whileInView={{ height: `${value > 0 ? Math.max(6, (value / peak) * 100) : 0}%` }}
                       viewport={{ once: true }}

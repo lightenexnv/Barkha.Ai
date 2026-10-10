@@ -68,7 +68,7 @@ export const RainfallPanel = ({ climate, className }: { climate: LocationClimate
   return (
     <div
       className={cn(
-        "relative space-y-4 overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 via-card to-accent/5 p-5",
+        "relative space-y-4 overflow-hidden rounded-xl border border-primary/20 bg-primary/5 p-5",
         status === "loading" && "opacity-70",
         className,
       )}
@@ -110,7 +110,7 @@ export const RainfallPanel = ({ climate, className }: { climate: LocationClimate
             <div key={index} className="group flex h-full flex-1 flex-col items-center justify-end gap-1">
               <div className="relative flex w-full flex-1 items-end">
                 <div
-                  className="w-full rounded-t bg-gradient-to-t from-primary to-accent transition-all duration-500 group-hover:from-accent"
+                  className="w-full rounded-t bg-primary transition-all duration-500 group-hover:bg-accent"
                   style={{ height: `${Math.max(2, (value / peak) * 100)}%` }}
                   title={`${MONTH_NAMES[index]}: ${value.toLocaleString(locale)} mm`}
                 />

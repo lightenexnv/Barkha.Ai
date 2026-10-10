@@ -9,14 +9,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-gradient-to-r from-primary to-primary-glow text-primary-foreground hover:shadow-water hover:scale-105 active:scale-95",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-water hover:scale-105 active:scale-95",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:scale-105 active:scale-95",
         outline: "border border-border bg-background hover:bg-primary/5 hover:border-primary/30 hover:text-primary",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:scale-105",
         ghost: "hover:bg-accent/10 hover:text-accent",
         link: "text-primary underline-offset-4 hover:underline",
-        ocean: "bg-gradient-ocean text-white hover:shadow-water hover:scale-105 active:scale-95",
-        nature: "bg-gradient-nature text-white hover:shadow-lg hover:scale-105 active:scale-95",
+        ocean: "bg-primary text-white hover:bg-primary/90 hover:shadow-water hover:scale-105 active:scale-95",
+        nature: "bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-lg hover:scale-105 active:scale-95",
         glass: "glass text-foreground hover:bg-white/20 backdrop-blur-lg",
         success: "bg-success text-success-foreground hover:bg-success/90 hover:scale-105",
         warning: "bg-warning text-warning-foreground hover:bg-warning/90 hover:scale-105",

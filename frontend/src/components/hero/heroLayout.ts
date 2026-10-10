@@ -157,34 +157,12 @@ export function paintBackdrop(
   const { waterline } = layout;
 
   // Sky
-  const sky = ctx.createLinearGradient(0, 0, 0, waterline);
-  sky.addColorStop(0, "#f5fbff");
-  sky.addColorStop(0.6, "#e3f2fb");
-  sky.addColorStop(1, "#c9e6f5");
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, width, waterline);
-
-  const sun = ctx.createRadialGradient(width * 0.78, 0, 0, width * 0.78, 0, Math.max(width, 600) * 0.55);
-  sun.addColorStop(0, "rgba(255, 255, 255, 0.9)");
-  sun.addColorStop(1, "rgba(255, 255, 255, 0)");
-  ctx.fillStyle = sun;
+  ctx.fillStyle = "#e6f3fb";
   ctx.fillRect(0, 0, width, waterline);
 
   // Water
-  const water = ctx.createLinearGradient(0, waterline, 0, height);
-  water.addColorStop(0, "#4fb3d6");
-  water.addColorStop(Math.min(0.35, 220 / Math.max(1, height - waterline)), "#1d7fb0");
-  water.addColorStop(0.7, "#0b4a72");
-  water.addColorStop(1, "#06263f");
-  ctx.fillStyle = water;
+  ctx.fillStyle = "#1572a6";
   ctx.fillRect(0, waterline, width, height - waterline);
-
-  // Light falling in from the surface.
-  const glow = ctx.createLinearGradient(0, waterline, 0, waterline + 160);
-  glow.addColorStop(0, "rgba(220, 245, 255, 0.35)");
-  glow.addColorStop(1, "rgba(220, 245, 255, 0)");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, waterline, width, 160);
 
   // Title
   const { fontSize, baselines, gutter, isDesktop } = layout;
@@ -204,12 +182,7 @@ export function paintBackdrop(
     TITLE_LINES.forEach((line, i) => {
       const baseline = baselines[i];
       if (i === 0) {
-        const lineWidth = ctx.measureText(line).width;
-        const left = isDesktop ? x : x - lineWidth / 2;
-        const g = ctx.createLinearGradient(left, 0, left + lineWidth, 0);
-        g.addColorStop(0, above ? "#0a63d1" : "#bfe9ff");
-        g.addColorStop(1, above ? "#14b1d4" : "#e9fbff");
-        ctx.fillStyle = g;
+        ctx.fillStyle = above ? "#0a63d1" : "#d6f2ff";
       } else {
         ctx.fillStyle = above ? "#0b2540" : "rgba(236, 249, 255, 0.96)";
       }

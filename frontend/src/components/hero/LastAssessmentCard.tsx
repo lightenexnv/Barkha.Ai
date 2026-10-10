@@ -11,6 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatCurrency } from "@/lib/api";
 import { entryVolume, useLatestImplementedAssessment } from "@/lib/historyService";
+import { harvestBetween, startOfMonth, useNow } from "@/lib/liveTracking";
 import type { SavedAssessment } from "@/lib/historyService";
 
 const QuickStat = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
@@ -25,22 +26,27 @@ const QuickStat = ({ icon, label, value }: { icon: React.ReactNode; label: strin
   </div>
 );
 
-/** Derives quick stat values from a saved assessment entry. */
-const useQuickStats = (entry: SavedAssessment | null) =>
-  useMemo(() => {
+/** Derives quick stat values from a saved assessment entry, counted from the moment it was marked implemented. */
+const useQuickStats = (entry: SavedAssessment | null) => {
+  const now = useNow(10_000);
+  return useMemo(() => {
     if (!entry) return null;
     const volume = entryVolume(entry);
-    const startDate = entry.implementedAt ? new Date(entry.implementedAt) : new Date(entry.createdAt);
-    const now = new Date();
-    const daysSince = Math.max(1, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const annualProportion = Math.min(1, Math.max(0.02, daysSince / 365));
-    const harvestedTillNowM3 = Math.max(0.5, volume * annualProportion);
-    const litres = Math.round(harvestedTillNowM3 * 1000);
-    const monthly = entry.result?.savings_analysis?.monthly_savings ?? 0;
+    const startDate = entry.implementedAt ? new Date(entry.implementedAt) : now;
+    const monthly = entry.result?.hydrology?.monthly_harvest;
+    // Seasonal monthly harvest when known; otherwise spread the year evenly
+    const months = monthly?.length === 12 ? monthly : Array.from({ length: 12 }, () => volume / 12);
+    const litres = Math.round(harvestBetween(months, startDate, now) * 1000);
+    // Saved this month, counted only since installation (never from the 1st if installed later)
+    const annualSavings = entry.result?.savings_analysis?.annual_cost_savings ?? 0;
+    const savingsPerM3 = volume > 0 ? annualSavings / volume : 0;
+    const monthFrom = new Date(Math.max(startDate.getTime(), startOfMonth(now).getTime()));
+    const monthlySavings = Math.round(harvestBetween(months, monthFrom, now) * savingsPerM3);
     const rainfall = entry.result?.hydrology?.annual_rainfall ?? entry.site?.annual_rainfall ?? 0;
     const siteName = entry.site.site_name || "Assessment";
-    return { volume, litres, monthly, rainfall, siteName, daysSince };
-  }, [entry]);
+    return { volume, litres, monthly: monthlySavings, rainfall, siteName };
+  }, [entry, now]);
+};
 
 /**
  * A sleek glass-morphism card submerged in the water under the 3D model.

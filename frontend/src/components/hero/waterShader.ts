@@ -85,8 +85,9 @@ export const waterFragmentShader = /* glsl */ `
     vec3 sceneColor = scene.a > 0.0 ? linearToSRGB(scene.rgb / scene.a) : vec3(0.0);
 
     // Submerged geometry cools toward the colour of the water around it.
-    vec3 waterTint = mix(vec3(0.36, 0.74, 0.86), vec3(0.03, 0.2, 0.34), depth);
-    sceneColor = mix(sceneColor, waterTint, below * (0.15 + 0.5 * depth));
+    // One flat water colour (no depth gradient), matching the painted water
+    vec3 waterTint = vec3(0.08, 0.45, 0.65);
+    sceneColor = mix(sceneColor, waterTint, below * 0.35);
 
     sceneAlpha = scene.a;
     return mix(backdrop, sceneColor, scene.a);
@@ -162,8 +163,8 @@ export const waterFragmentShader = /* glsl */ `
     float crest = exp(-pow(d * 0.6, 2.0));
     color = mix(color, vec3(1.0), crest * clamp((0.55 + 0.25 * lift) * shimmer + 0.6 * (glintA + glintB) + 0.5 * flash, 0.0, 1.0));
 
-    // Light entering the water, fading over the first few dozen px.
-    color += below * (0.05 + 0.10 * flash) * exp(-max(d, 0.0) / 40.0);
+    // A flash briefly brightens the whole water evenly (no fading band)
+    color += below * 0.06 * flash;
 
     // Caustic ripples under the surface, strongest near it and during a flash.
     if (d > 0.0) {

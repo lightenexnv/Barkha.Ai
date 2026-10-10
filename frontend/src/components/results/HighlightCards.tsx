@@ -8,6 +8,7 @@ import { formatCurrency, type AssessmentResult, type SiteDetailsInput } from "@/
 import { tankersPerYear } from "@/lib/saral";
 import { cn } from "@/lib/utils";
 import { MonthlyReportModal } from "./MonthlyReportModal";
+import { elapsedParts, harvestBetween, startOfMonth, useNow } from "@/lib/liveTracking";
 import type { MonthlyRecord, MonthlyReportData } from "@/lib/monthlyReportGenerator";
 
 interface HighlightCardsProps {
@@ -127,80 +128,68 @@ export const HighlightCards = ({
   const { t, locale } = useLanguage();
   const [reportModalOpen, setReportModalOpen] = useState(false);
 
-  // Dynamic calculations from implementation date
+  // Live figures count from the exact moment the system was marked implemented
+  const now = useNow(10_000);
   const dynamicStats = useMemo(() => {
     if (!isImplemented) return null;
 
-    const startDate = implementedAt ? new Date(implementedAt) : new Date();
-    const now = new Date();
-    const daysSinceImplemented = Math.max(1, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-
+    const startDate = implementedAt ? new Date(implementedAt) : now;
     const monthlyRainfall = result.hydrology?.monthly_rainfall || site.monthly_rainfall || [15, 20, 25, 40, 80, 160, 280, 240, 120, 35, 15, 10];
     const totalRainMm = monthlyRainfall.reduce((a, b) => a + b, 0) || 800;
-
-    // Monthly harvest in m3
     const monthlyHarvest = result.hydrology?.monthly_harvest?.length === 12
       ? result.hydrology.monthly_harvest
       : monthlyRainfall.map((r) => (r / totalRainMm) * harvestM3);
+    // Rupees saved per m³ collected (only the share the site actually uses is a saving)
+    const savingsPerM3 = harvestM3 > 0 ? annualSavings / harvestM3 : 0;
 
-    const currentMonthIndex = now.getMonth();
-    const startMonthIndex = startDate.getMonth();
-    const dayRatio = Math.min(1, Math.max(0.1, now.getDate() / 30));
-
-    let cumulativeSavings = 0;
-    const records: MonthlyRecord[] = [];
-
-    // Build 12-month records
-    for (let i = 0; i < 12; i++) {
-      const isPastOrCurrent = (i <= currentMonthIndex && i >= startMonthIndex) || (startMonthIndex > currentMonthIndex && (i >= startMonthIndex || i <= currentMonthIndex));
-      const mHarvest = monthlyHarvest[i];
-      const mSavings = Math.round(mHarvest * tariff);
-      cumulativeSavings += mSavings;
-
-      records.push({
-        monthIndex: i,
-        monthName: MONTH_NAMES[i],
-        rainMm: monthlyRainfall[i] || 0,
-        harvestM3: mHarvest,
-        harvestLitres: Math.round(mHarvest * 1000),
-        savings: mSavings,
-        cumulativeSavings,
-        status: isPastOrCurrent ? "Actual" : "Projected",
-      });
-    }
-
-    // Water harvested till now calculation:
-    // Prorate by days elapsed or monthly progression
-    const monthsElapsed = Math.max(0.2, (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30.4));
-    const annualProportion = Math.min(1, Math.max(0.02, daysSinceImplemented / 365));
-    const harvestedTillNowM3 = Math.max(0.5, harvestM3 * annualProportion);
+    const harvestedTillNowM3 = harvestBetween(monthlyHarvest, startDate, now);
     const harvestedTillNowLitres = Math.round(harvestedTillNowM3 * 1000);
+    const totalSavingsTillNow = harvestedTillNowM3 * savingsPerM3;
+    const thisMonthFrom = new Date(Math.max(startDate.getTime(), startOfMonth(now).getTime()));
+    const savedThisMonth = harvestBetween(monthlyHarvest, thisMonthFrom, now) * savingsPerM3;
 
-    // Savings this month
-    const curMonthHarvest = monthlyHarvest[currentMonthIndex] || (harvestM3 / 12);
-    const savedThisMonth = Math.round(curMonthHarvest * tariff * dayRatio);
-    const totalSavingsTillNow = Math.round(harvestedTillNowM3 * tariff);
-
-    // Remaining payback
     const netCost = Math.max(0, totalCost - subsidyAmount);
     const remainingCost = Math.max(0, netCost - totalSavingsTillNow);
     const remainingYears = annualSavings > 0 ? remainingCost / annualSavings : null;
 
+    // Twelve months from the installation month: elapsed time is "Actual",
+    // the rest of each month (and later months) is "Projected"
+    let cumulativeSavings = 0;
+    const records: MonthlyRecord[] = Array.from({ length: 12 }, (_, k) => {
+      const begin = new Date(startDate.getFullYear(), startDate.getMonth() + k, 1);
+      const finish = new Date(startDate.getFullYear(), startDate.getMonth() + k + 1, 1);
+      const from = new Date(Math.max(begin.getTime(), startDate.getTime()));
+      const elapsed = begin < now;
+      const mHarvest = harvestBetween(monthlyHarvest, from, elapsed ? new Date(Math.min(now.getTime(), finish.getTime())) : finish);
+      const mSavings = Math.round(mHarvest * savingsPerM3);
+      cumulativeSavings += mSavings;
+      return {
+        monthIndex: begin.getMonth(),
+        monthName: MONTH_NAMES[begin.getMonth()],
+        rainMm: monthlyRainfall[begin.getMonth()] || 0,
+        harvestM3: mHarvest,
+        harvestLitres: Math.round(mHarvest * 1000),
+        savings: mSavings,
+        cumulativeSavings,
+        status: elapsed ? "Actual" : "Projected",
+      };
+    });
+
     const reportData: MonthlyReportData = {
       site,
       result,
-      implementedAt: implementedAt || startDate.toISOString(),
+      implementedAt: startDate.toISOString(),
       records,
       totalHarvestM3: harvestedTillNowM3,
       totalHarvestLitres: harvestedTillNowLitres,
-      totalSavings: totalSavingsTillNow,
-      monthlySavings: savedThisMonth,
+      totalSavings: Math.round(totalSavingsTillNow),
+      monthlySavings: Math.round(savedThisMonth),
       remainingPaybackYears: remainingYears,
       netCost,
     };
 
     return {
-      daysSinceImplemented,
+      elapsed: elapsedParts(startDate, now),
       harvestedTillNowM3,
       harvestedTillNowLitres,
       savedThisMonth,
@@ -211,7 +200,7 @@ export const HighlightCards = ({
       startDate,
       reportData,
     };
-  }, [isImplemented, implementedAt, harvestM3, tariff, totalCost, subsidyAmount, annualSavings, result, site]);
+  }, [isImplemented, implementedAt, now, harvestM3, totalCost, subsidyAmount, annualSavings, result, site]);
 
   // Standard planning mode calculations
   const litres = Math.round(harvestM3 * 1000).toLocaleString(locale);
@@ -225,18 +214,18 @@ export const HighlightCards = ({
         <motion.div initial="hidden" animate="show" variants={stagger(0.1)} className="grid gap-4 md:grid-cols-3">
           {/* 1. Water harvested till now */}
           <Card
-            gradient="bg-gradient-to-br from-sky-500 via-blue-600 to-blue-800"
+            gradient="bg-blue-600"
             icon={<Droplets className="h-6 w-6 text-cyan-200" />}
             label="Water harvested till now"
             value={`${dynamicStats.harvestedTillNowLitres.toLocaleString(locale)} L`}
-            sub={`Active for ${dynamicStats.daysSinceImplemented} days (${dynamicStats.harvestedTillNowM3.toFixed(1)} m³)`}
-            tip={`Calculated from the day your system was marked implemented (${dynamicStats.startDate.toLocaleDateString(locale)}).`}
+            sub={`${t(`live.since.${dynamicStats.elapsed.unit}`, { count: dynamicStats.elapsed.value })} · ${dynamicStats.harvestedTillNowM3.toFixed(2)} m³`}
+            tip={t("live.sinceTip", { when: dynamicStats.startDate.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) })}
             tag="Live Tracking"
           />
 
           {/* 2. Money saved this month (clickable to open monthly report dialog) */}
           <Card
-            gradient="bg-gradient-to-br from-emerald-500 via-teal-600 to-teal-800"
+            gradient="bg-emerald-600"
             icon={<PiggyBank className="h-6 w-6 text-emerald-200" />}
             label="Money saved this month"
             value={formatCurrency(dynamicStats.savedThisMonth)}
@@ -248,7 +237,7 @@ export const HighlightCards = ({
 
           {/* 3. To be paid in __ years (optimal heading: Paid off in) */}
           <Card
-            gradient="bg-gradient-to-br from-cyan-500 via-teal-500 to-emerald-700"
+            gradient="bg-teal-600"
             icon={<CalendarClock className="h-6 w-6 text-teal-200" />}
             label="Paid off in"
             value={dynamicStats.remainingYears !== null ? `${dynamicStats.remainingYears.toFixed(1)} years` : "N/A"}
@@ -272,7 +261,7 @@ export const HighlightCards = ({
   return (
     <motion.div initial="hidden" animate="show" variants={stagger(0.1)} className="grid gap-4 md:grid-cols-3">
       <Card
-        gradient="bg-gradient-to-br from-sky-500 via-blue-600 to-blue-800"
+        gradient="bg-blue-600"
         icon={<Droplets className="h-6 w-6" />}
         label={t("highlight.harvest")}
         value={`${harvestM3.toLocaleString(locale, { maximumFractionDigits: 1 })} m³`}
@@ -280,7 +269,7 @@ export const HighlightCards = ({
         tip={t("highlight.harvestTip")}
       />
       <Card
-        gradient="bg-gradient-to-br from-emerald-500 via-teal-600 to-teal-800"
+        gradient="bg-emerald-600"
         icon={<PiggyBank className="h-6 w-6" />}
         label={t("highlight.monthly")}
         value={formatCurrency(monthlySavings)}
@@ -291,7 +280,7 @@ export const HighlightCards = ({
         })}
       />
       <Card
-        gradient="bg-gradient-to-br from-cyan-500 via-teal-500 to-emerald-700"
+        gradient="bg-teal-600"
         icon={<CalendarClock className="h-6 w-6" />}
         label={t("highlight.payback")}
         value={effectivePayback === null ? t("highlight.notApplicable") : years(effectivePayback)}

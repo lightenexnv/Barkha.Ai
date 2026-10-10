@@ -52,10 +52,10 @@
     --ring: 210 100% 45%;
 
     /* Water-Inspired Gradients */
-    --gradient-ocean: linear-gradient(135deg, hsl(210 100% 45%), hsl(190 85% 55%));
-    --gradient-water: linear-gradient(180deg, hsl(210 100% 98%), hsl(190 70% 88%));
-    --gradient-nature: linear-gradient(135deg, hsl(150 60% 50%), hsl(120 50% 60%));
-    --gradient-rain: linear-gradient(45deg, hsl(210 100% 85%), hsl(190 70% 75%));
+    --gradient-ocean: linear-gradient(hsl(210 100% 45%), hsl(210 100% 45%));
+    --gradient-water: linear-gradient(hsl(205 80% 94%), hsl(205 80% 94%));
+    --gradient-nature: linear-gradient(hsl(150 60% 40%), hsl(150 60% 40%));
+    --gradient-rain: linear-gradient(hsl(205 90% 80%), hsl(205 90% 80%));
 
     /* Shadows & Effects */
     --shadow-water: 0 10px 30px -10px hsl(210 100% 45% / 0.3);
@@ -111,10 +111,10 @@
     --ring: 210 100% 60%;
 
     /* Dark Gradients */
-    --gradient-ocean: linear-gradient(135deg, hsl(210 100% 25%), hsl(190 85% 35%));
-    --gradient-water: linear-gradient(180deg, hsl(210 50% 6%), hsl(210 40% 12%));
-    --gradient-nature: linear-gradient(135deg, hsl(150 60% 25%), hsl(120 50% 35%));
-    --gradient-rain: linear-gradient(45deg, hsl(210 100% 25%), hsl(190 70% 30%));
+    --gradient-ocean: linear-gradient(hsl(210 100% 30%), hsl(210 100% 30%));
+    --gradient-water: linear-gradient(hsl(210 45% 9%), hsl(210 45% 9%));
+    --gradient-nature: linear-gradient(hsl(150 60% 28%), hsl(150 60% 28%));
+    --gradient-rain: linear-gradient(hsl(205 90% 28%), hsl(205 90% 28%));
 
     --shadow-water: 0 10px 30px -10px hsl(210 100% 25% / 0.4);
     --shadow-soft: 0 4px 20px -4px hsl(210 40% 8% / 0.3);
@@ -179,14 +179,8 @@
   }
 
   .animate-shimmer {
-    background: linear-gradient(
-      90deg,
-      transparent,
-      hsl(var(--primary-light)),
-      transparent
-    );
-    background-size: 200px 100%;
-    animation: shimmer 2s infinite;
+    background-color: hsl(var(--primary-light) / 0.35);
+    animation: pulse 2s infinite;
   }
 
   /* Glass morphism effects */
@@ -198,12 +192,9 @@
     @apply bg-card/80 backdrop-blur-lg border border-border/50 shadow-soft;
   }
 
-  /* Gradient text */
+  /* Accent heading text (solid brand colour) */
   .gradient-text {
-    background: var(--gradient-ocean);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: hsl(var(--primary));
   }
 
   /* Interactive elements */
@@ -212,13 +203,13 @@
   }
 
   .water-button {
-    @apply bg-gradient-to-r from-primary to-primary-glow text-primary-foreground 
+    @apply bg-primary text-primary-foreground 
            hover:shadow-water hover:scale-105 active:scale-95 
            transition-all duration-300 rounded-lg;
   }
 
   .nature-button {
-    @apply bg-gradient-to-r from-accent to-accent-light text-accent-foreground
+    @apply bg-accent text-accent-foreground
            hover:shadow-lg hover:scale-105 active:scale-95
            transition-all duration-300 rounded-lg;
   }

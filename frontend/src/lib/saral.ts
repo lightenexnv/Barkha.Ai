@@ -17,7 +17,7 @@ export const SARAL_LANGUAGES = [
 export type SaralLang = (typeof SARAL_LANGUAGES)[number]["code"];
 
 type Phrase =
-  | "welcome" | "askLocation" | "gps" | "orSay" | "confirmPlace" | "placeNotFound" | "locating"
+  | "welcome" | "askLocation" | "gps" | "orSay" | "typePlace" | "find" | "confirmPlace" | "placeNotFound" | "locating"
   | "askRoof" | "small" | "smallHint" | "medium" | "mediumHint" | "large" | "largeHint" | "building" | "buildingHint"
   | "askMaterial" | "concrete" | "tile" | "metal" | "asbestos" | "thatched"
   | "askPeople" | "people" | "next" | "yes" | "no" | "back"
@@ -31,11 +31,12 @@ type Book = Record<Phrase, string>;
 
 const hi: Book = {
   welcome: "बहुत अच्छा। मैं आपसे चार आसान सवाल पूछूँगा।",
-  askLocation: "आपका घर कहाँ है? अपने शहर या मोहल्ले का नाम बोलिए, या नीचे बटन दबाइए।",
+  askLocation: "आप किस शहर या गाँव में रहते हैं? बस नाम बोलिए, जैसे 'जयपुर'। या नीचे बटन दबाइए।",
   gps: "मेरी अभी की जगह",
+  typePlace: "या शहर/गाँव का नाम लिखिए", find: "ढूँढें",
   orSay: "या शहर का नाम बोलिए",
   confirmPlace: "क्या आपका घर {place} में है?",
-  placeNotFound: "यह जगह नहीं मिली। फिर से बोलिए या बटन दबाइए।",
+  placeNotFound: "यह नाम नहीं मिला। बस शहर का नाम बोलिए, या नाम लिखिए, या 'मेरी अभी की जगह' दबाइए।",
   locating: "जगह ढूँढ रहा हूँ…",
   askRoof: "आपका घर कितना बड़ा है? तस्वीर चुनिए।",
   small: "छोटा घर", smallHint: "1–2 कमरे",
@@ -66,11 +67,12 @@ const hi: Book = {
 
 const en: Book = {
   welcome: "Great. I will ask you four easy questions.",
-  askLocation: "Where is your house? Say your town or area, or press the button below.",
+  askLocation: "Which town or village do you live in? Just say the name, like 'Jaipur'. Or press the button below.",
   gps: "Use my current location",
+  typePlace: "or type your town / village", find: "Find",
   orSay: "or say your town",
   confirmPlace: "Is your house in {place}?",
-  placeNotFound: "I could not find that place. Please say it again or press the button.",
+  placeNotFound: "I could not find that name. Just say the town name, or type it, or press 'Use my current location'.",
   locating: "Finding your place…",
   askRoof: "How big is your house? Pick a picture.",
   small: "Small house", smallHint: "1–2 rooms",
@@ -104,6 +106,7 @@ const mr: Book = {
   welcome: "छान. मी तुम्हाला चार सोपे प्रश्न विचारेन.",
   askLocation: "तुमचे घर कुठे आहे? तुमच्या गावाचे किंवा भागाचे नाव सांगा, किंवा खालचे बटण दाबा.",
   gps: "माझे सध्याचे ठिकाण",
+  typePlace: "किंवा गावाचे नाव लिहा", find: "शोधा",
   orSay: "किंवा गावाचे नाव सांगा",
   confirmPlace: "तुमचे घर {place} मध्ये आहे का?",
   placeNotFound: "हे ठिकाण सापडले नाही. पुन्हा सांगा किंवा बटण दाबा.",
@@ -139,6 +142,7 @@ const bn: Book = {
   welcome: "খুব ভালো। আমি আপনাকে চারটি সহজ প্রশ্ন করব।",
   askLocation: "আপনার বাড়ি কোথায়? আপনার শহর বা পাড়ার নাম বলুন, অথবা নিচের বোতাম টিপুন।",
   gps: "আমার এখনকার জায়গা",
+  typePlace: "অথবা শহর/গ্রামের নাম লিখুন", find: "খুঁজুন",
   orSay: "অথবা শহরের নাম বলুন",
   confirmPlace: "আপনার বাড়ি কি {place}-এ?",
   placeNotFound: "জায়গাটি পাওয়া গেল না। আবার বলুন অথবা বোতাম টিপুন।",
@@ -174,6 +178,7 @@ const ta: Book = {
   welcome: "நல்லது. நான் உங்களிடம் நான்கு எளிய கேள்விகள் கேட்பேன்.",
   askLocation: "உங்கள் வீடு எங்கே உள்ளது? உங்கள் ஊர் அல்லது பகுதியின் பெயரைச் சொல்லுங்கள், அல்லது கீழே உள்ள பொத்தானை அழுத்துங்கள்.",
   gps: "என் தற்போதைய இடம்",
+  typePlace: "அல்லது ஊர் பெயரை எழுதுங்கள்", find: "தேடு",
   orSay: "அல்லது ஊர் பெயரைச் சொல்லுங்கள்",
   confirmPlace: "உங்கள் வீடு {place} இல் உள்ளதா?",
   placeNotFound: "அந்த இடம் கிடைக்கவில்லை. மீண்டும் சொல்லுங்கள் அல்லது பொத்தானை அழுத்துங்கள்.",
@@ -209,6 +214,7 @@ const te: Book = {
   welcome: "చాలా బాగుంది. నేను మిమ్మల్ని నాలుగు సులభమైన ప్రశ్నలు అడుగుతాను.",
   askLocation: "మీ ఇల్లు ఎక్కడ ఉంది? మీ ఊరు లేదా ప్రాంతం పేరు చెప్పండి, లేదా కింద ఉన్న బటన్ నొక్కండి.",
   gps: "నా ప్రస్తుత స్థలం",
+  typePlace: "లేదా ఊరి పేరు రాయండి", find: "వెతకండి",
   orSay: "లేదా ఊరి పేరు చెప్పండి",
   confirmPlace: "మీ ఇల్లు {place} లో ఉందా?",
   placeNotFound: "ఆ స్థలం దొరకలేదు. మళ్ళీ చెప్పండి లేదా బటన్ నొక్కండి.",
@@ -244,6 +250,7 @@ const gu: Book = {
   welcome: "ખૂબ સરસ. હું તમને ચાર સરળ પ્રશ્નો પૂછીશ.",
   askLocation: "તમારું ઘર ક્યાં છે? તમારા ગામ કે વિસ્તારનું નામ બોલો, અથવા નીચેનું બટન દબાવો.",
   gps: "મારું હાલનું સ્થાન",
+  typePlace: "અથવા ગામનું નામ લખો", find: "શોધો",
   orSay: "અથવા ગામનું નામ બોલો",
   confirmPlace: "શું તમારું ઘર {place} માં છે?",
   placeNotFound: "એ જગ્યા મળી નહીં. ફરી બોલો અથવા બટન દબાવો.",
@@ -279,6 +286,7 @@ const kn: Book = {
   welcome: "ತುಂಬಾ ಒಳ್ಳೆಯದು. ನಾನು ನಿಮಗೆ ನಾಲ್ಕು ಸುಲಭ ಪ್ರಶ್ನೆಗಳನ್ನು ಕೇಳುತ್ತೇನೆ.",
   askLocation: "ನಿಮ್ಮ ಮನೆ ಎಲ್ಲಿದೆ? ನಿಮ್ಮ ಊರು ಅಥವಾ ಪ್ರದೇಶದ ಹೆಸರು ಹೇಳಿ, ಅಥವಾ ಕೆಳಗಿನ ಬಟನ್ ಒತ್ತಿ.",
   gps: "ನನ್ನ ಈಗಿನ ಸ್ಥಳ",
+  typePlace: "ಅಥವಾ ಊರಿನ ಹೆಸರು ಬರೆಯಿರಿ", find: "ಹುಡುಕಿ",
   orSay: "ಅಥವಾ ಊರಿನ ಹೆಸರು ಹೇಳಿ",
   confirmPlace: "ನಿಮ್ಮ ಮನೆ {place} ನಲ್ಲಿದೆಯೇ?",
   placeNotFound: "ಆ ಸ್ಥಳ ಸಿಗಲಿಲ್ಲ. ಮತ್ತೆ ಹೇಳಿ ಅಥವಾ ಬಟನ್ ಒತ್ತಿ.",
@@ -403,3 +411,55 @@ export const BUCKET_LITRES = 15;
 
 export const tankersPerYear = (m3: number) => Math.max(0, Math.round((m3 * 1000) / TANKER_LITRES));
 export const bucketsPerDay = (m3PerYear: number) => Math.max(0, Math.round((m3PerYear * 1000) / 365 / BUCKET_LITRES));
+
+/* ------------------------------------------------------------------ */
+/* Place names from speech                                             */
+/* ------------------------------------------------------------------ */
+
+// Words people say around a place name ("my house is in ...") in the
+// supported languages; they make a map search fail, so they are dropped.
+const PLACE_FILLERS = new Set([
+  "my", "house", "home", "is", "in", "at", "near", "the", "city", "town", "village", "district", "area", "live", "i", "we", "our", "of",
+  "mera", "meri", "mere", "ghar", "hai", "hain", "mein", "me", "main", "rehta", "rehte", "hoon", "hu", "shahar", "gaon", "gaanv", "jila", "ke", "ki", "ka", "paas",
+  "मेरा", "मेरी", "मेरे", "हमारा", "घर", "है", "हैं", "में", "मे", "मैं", "रहता", "रहती", "रहते", "हूँ", "हूं", "शहर", "गांव", "गाँव", "जिला", "ज़िला", "के", "की", "का", "पास", "पर",
+  "माझे", "माझं", "आमचे", "घर", "आहे", "मध्ये", "गाव", "शहरात", "राहतो", "राहते",
+  "আমার", "বাড়ি", "বাড়ি", "শহর", "গ্রাম", "আছে", "থাকি",
+  "என்", "எங்கள்", "வீடு", "ஊர்", "உள்ளது", "இருக்கிறது",
+  "నా", "మా", "ఇల్లు", "ఊరు", "ఉంది",
+  "મારું", "અમારું", "ઘર", "છે", "ગામ", "શહેર",
+  "ನನ್ನ", "ನಮ್ಮ", "ಮನೆ", "ಊರು", "ಇದೆ",
+]);
+
+// Case endings fused to the place name ("சென்னையில்" = in Chennai)
+const PLACE_SUFFIXES = ["ையில்", "யில்", "இல்", "ில்", "ல்", "లో", "ನಲ್ಲಿ", "ದಲ್ಲಿ", "ಲ್ಲಿ", "માં", "তে", "এ", "ला", "ात", "मध्ये"];
+
+const stripSuffix = (word: string) => {
+  for (const suffix of PLACE_SUFFIXES) {
+    if (word.length > suffix.length + 2 && word.endsWith(suffix)) return word.slice(0, -suffix.length);
+  }
+  return word;
+};
+
+/**
+ * Search queries to try for a spoken place, most specific first: the whole
+ * phrase without filler words, then each remaining word on its own (longest
+ * first), with and without a fused case ending.
+ */
+export const placeQueries = (alternatives: string[]) => {
+  const queries: string[] = [];
+  const push = (q: string) => {
+    const clean = q.trim();
+    if (clean.length >= 3 && !queries.includes(clean)) queries.push(clean);
+  };
+  for (const heard of alternatives.slice(0, 2)) {
+    const words = normalise(heard).split(" ").filter((w) => w && !PLACE_FILLERS.has(w));
+    if (!words.length) continue;
+    push(words.join(" "));
+    push(words.map(stripSuffix).join(" "));
+    [...words].sort((a, b) => b.length - a.length).forEach((w) => {
+      push(w);
+      push(stripSuffix(w));
+    });
+  }
+  return queries.slice(0, 6);
+};

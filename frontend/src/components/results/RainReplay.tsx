@@ -176,7 +176,7 @@ export const RainReplay = ({
                 <span className="tabular-nums text-muted-foreground">{tankPct}%</span>
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-blue-600 transition-[width] duration-150" style={{ width: `${tankPct}%` }} />
+                <div className="h-full rounded-full bg-blue-600 transition-[width] duration-150" style={{ width: `${tankPct}%` }} />
               </div>
             </div>
           )}

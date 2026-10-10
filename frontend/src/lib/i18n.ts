@@ -529,6 +529,11 @@ export const en = {
   "apply.readyDesc": "Print it, sign it and attach the listed documents.",
   "apply.failed": "Could not prepare the form",
   "apply.failedDesc": "Please try again in a moment.",
+  "live.since.now": "Started just now",
+  "live.since.minutes": "Running for {count} min",
+  "live.since.hours": "Running for {count} h",
+  "live.since.days": "Running for {count} days",
+  "live.sinceTip": "Counted from the moment you marked the system as installed ({when}), using the expected rain for each month.",
 } as const;
 
 export type TranslationKey = keyof typeof en;

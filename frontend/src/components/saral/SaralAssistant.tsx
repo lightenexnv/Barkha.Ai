@@ -9,12 +9,13 @@ import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { api, type AssessmentResult, type SiteDetailsInput } from "@/lib/api";
-import { fetchRainfall, reverseGeocode, searchPlaces } from "@/lib/climate";
+import { fetchRainfall, findPlaceInIndia, reverseGeocode } from "@/lib/climate";
+import { Input } from "@/components/ui/input";
 import { buildAssessmentEntry, saveAssessment } from "@/lib/historyService";
 import { isLanguageCode } from "@/lib/i18n";
 import {
   ASK_LANGUAGE, MATERIAL_WORDS, ROOF_SIZE_AREA, ROOF_SIZE_WORDS, SARAL_LANGUAGES, YES_NO_WORDS,
-  matchKeyword, matchLanguage, parseCount, say, tankersPerYear, type RoofSize, type SaralLang,
+  matchKeyword, matchLanguage, parseCount, placeQueries, say, tankersPerYear, type RoofSize, type SaralLang,
 } from "@/lib/saral";
 import { ROOF_MATERIAL_OPTIONS } from "@/lib/siteOptions";
 import { shareMessage, whatsappUrl } from "@/lib/share";
@@ -66,6 +67,7 @@ export const SaralAssistant = () => {
   const [heard, setHeard] = useState("");
   const [hint, setHint] = useState("");
   const [busy, setBusy] = useState(false);
+  const [typed, setTyped] = useState("");
 
   const session = useRef(0);
   const listener = useRef<ListenHandle | null>(null);
@@ -141,18 +143,28 @@ export const SaralAssistant = () => {
     goTo("location");
   };
 
-  const findPlace = async (query: string) => {
+  /**
+   * Find a place from what was said or typed. Speech wraps the name in a
+   * sentence ("mera ghar Jaipur mein hai"), so filler words are dropped and
+   * the remaining words are tried one by one until the map knows one.
+   */
+  const findPlace = async (alternatives: string[]) => {
     setBusy(true);
+    setHint("");
     try {
-      const results = await searchPlaces(query);
-      if (!results.length) {
-        setHint("placeNotFound");
-        return;
+      const queries = placeQueries(alternatives);
+      for (let i = 0; i < queries.length; i++) {
+        // The free map search allows about one request a second
+        if (i > 0) await new Promise((resolve) => setTimeout(resolve, 1100));
+        const hit = await findPlaceInIndia(queries[i]).catch(() => null);
+        if (hit) {
+          setPlace({ latitude: hit.latitude, longitude: hit.longitude, label: hit.label });
+          goTo("confirm");
+          return;
+        }
       }
-      setPlace({ latitude: results[0].latitude, longitude: results[0].longitude, label: results[0].label });
-      goTo("confirm");
-    } catch {
       setHint("placeNotFound");
+      void talk(say(lang, "placeNotFound"));
     } finally {
       setBusy(false);
     }
@@ -260,7 +272,7 @@ export const SaralAssistant = () => {
         case "location":
           await talk(`${say(lang, "welcome")} ${say(lang, "askLocation")}`);
           if (!live()) return;
-          await hear((alts) => void findPlace(alts[0]));
+          await hear((alts) => void findPlace(alts));
           return;
         case "confirm":
           if (!place) return;
@@ -347,7 +359,7 @@ export const SaralAssistant = () => {
         if (match) chooseLanguage(match);
         else setHint("notUnderstood");
       },
-      location: (alts) => void findPlace(alts[0]),
+      location: (alts) => void findPlace(alts),
       confirm: (alts) => {
         const answer = matchKeyword(alts, YES_NO_WORDS);
         if (answer === "yes") goTo("roof");
@@ -409,7 +421,7 @@ export const SaralAssistant = () => {
         whileTap={{ scale: 0.92 }}
         transition={{ type: "spring", stiffness: 380, damping: 20, delay: 0.6 }}
         aria-label="Saral voice helper: speak to get your rainwater plan"
-        className="fixed bottom-5 end-5 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-700 text-white shadow-[0_12px_32px_-8px_rgba(2,119,184,0.8)] sm:bottom-7 sm:end-7"
+        className="fixed bottom-5 end-5 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 text-white shadow-[0_12px_32px_-8px_rgba(2,119,184,0.8)] sm:bottom-7 sm:end-7"
       >
         <span aria-hidden="true" className="absolute inset-0 animate-ping rounded-full bg-sky-400/40" />
         <Mic className="relative h-7 w-7" />
@@ -492,6 +504,25 @@ export const SaralAssistant = () => {
                     {busy ? say(lang, "locating") : say(lang, "gps")}
                   </Button>
                   <p className="text-center text-base text-muted-foreground">{say(lang, "orSay")}</p>
+                  {/* Typing is the fallback when the spoken name is not recognised */}
+                  <form
+                    className="flex gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (typed.trim()) void findPlace([typed]);
+                    }}
+                  >
+                    <Input
+                      value={typed}
+                      onChange={(event) => setTyped(event.target.value)}
+                      placeholder={say(lang, "typePlace")}
+                      aria-label={say(lang, "typePlace")}
+                      className="h-14 rounded-2xl text-lg"
+                    />
+                    <Button type="submit" variant="outline" className="h-14 rounded-2xl px-5 text-lg" disabled={busy || !typed.trim()}>
+                      {say(lang, "find")}
+                    </Button>
+                  </form>
                 </div>
               )}
 
@@ -626,7 +657,7 @@ export const SaralAssistant = () => {
                     aria-label={say(lang, "tapMic")}
                     className={cn(
                       "relative flex h-20 w-20 items-center justify-center rounded-full text-white shadow-lg",
-                      listening ? "bg-destructive" : "bg-gradient-to-br from-sky-500 to-blue-700",
+                      listening ? "bg-destructive" : "bg-blue-600",
                     )}
                   >
                     {listening && <span className="absolute inset-0 animate-ping rounded-full bg-destructive/40" />}
@@ -670,7 +701,7 @@ const SaralResult = ({
   const verdict = verdictOf(result);
   const total = result.financial_statement?.total_cost ?? result.cost_analysis.total_cost;
   const yearly = result.savings_analysis.annual_cost_savings;
-  const tone = verdict === "good" ? "from-emerald-500 to-teal-700" : verdict === "no" ? "from-slate-500 to-slate-700" : "from-sky-500 to-blue-700";
+  const tone = verdict === "good" ? "bg-emerald-600" : verdict === "no" ? "bg-slate-600" : "bg-blue-600";
   const title = say(lang, verdict === "good" ? "verdictGood" : verdict === "ok" ? "verdictOk" : verdict === "recharge" ? "verdictRecharge" : "verdictNo");
 
   return (
@@ -679,7 +710,7 @@ const SaralResult = ({
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 260, damping: 18 }}
-        className={cn("rounded-3xl bg-gradient-to-br p-6 text-center text-white shadow-xl", tone)}
+        className={cn("rounded-3xl p-6 text-center text-white shadow-xl", tone)}
       >
         <p className="text-3xl font-extrabold sm:text-4xl">{title}</p>
       </motion.div>
