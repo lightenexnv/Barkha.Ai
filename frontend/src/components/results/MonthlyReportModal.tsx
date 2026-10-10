@@ -70,7 +70,7 @@ export const MonthlyReportModal = ({ open, onOpenChange, data }: MonthlyReportMo
         {/* Highlight summary cards */}
         <div className="grid grid-cols-3 gap-3 py-3">
           <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3">
-            <p className="text-[11px] font-semibold uppercase text-sky-600 dark:text-sky-400">Harvested Till Now</p>
+            <p className="text-[11px] font-semibold uppercase text-sky-600 dark:text-sky-400">Estimated Collected So Far</p>
             <p className="mt-1 text-lg font-bold text-sky-950 dark:text-sky-100">
               {data.totalHarvestLitres.toLocaleString("en-IN")} L
             </p>
@@ -114,7 +114,7 @@ export const MonthlyReportModal = ({ open, onOpenChange, data }: MonthlyReportMo
                   <td className="py-2.5 px-2 text-center">
                     <span
                       className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                        rec.status === "Actual"
+                        rec.status === "Estimated"
                           ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                           : "bg-muted text-muted-foreground border border-border"
                       }`}

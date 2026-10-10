@@ -77,7 +77,7 @@ export const LastAssessmentCard = () => {
           {stats.siteName}
         </h3>
         <span className="shrink-0 rounded-full bg-white/20 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">
-          ACTIVE
+          Installed
         </span>
       </div>
 
@@ -85,12 +85,12 @@ export const LastAssessmentCard = () => {
       <div className="relative mb-5 grid grid-cols-3 gap-2 sm:gap-4">
         <QuickStat
           icon={<Droplets className="h-5 w-5 text-cyan-300" />}
-          label="Harvested Till Now"
+          label="Est. Collected"
           value={`${stats.litres.toLocaleString("en-IN")} L`}
         />
         <QuickStat
           icon={<PiggyBank className="h-5 w-5 text-emerald-300" />}
-          label="Saved This Month"
+          label="Est. Saved This Month"
           value={formatCurrency(stats.monthly)}
         />
         <QuickStat

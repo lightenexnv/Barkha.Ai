@@ -91,7 +91,6 @@ export const MonsoonLive = ({ input, result }: { input: SiteDetailsInput; result
         <div className="flex items-start gap-3">
           <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
             <CloudRain className="h-5 w-5 text-sky-600" />
-            <span className="absolute -end-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
           </span>
           <div>
             <h2 id="live-title" className="flex items-center gap-1.5 text-xl font-bold">

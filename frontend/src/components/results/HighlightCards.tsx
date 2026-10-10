@@ -129,10 +129,6 @@ const LiveFlow = ({
     <motion.section variants={fadeUp} initial="hidden" animate="show" aria-label={t("flow.title")} className="glass-card rounded-2xl p-4 sm:p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 font-semibold">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          </span>
           {t("flow.title")}
         </h3>
         <span className="text-xs text-muted-foreground">{sinceLabel}</span>
@@ -145,6 +141,7 @@ const LiveFlow = ({
           </div>
         ))}
       </dl>
+      <p className="mt-3 text-xs text-muted-foreground">{t("flow.note")}</p>
     </motion.section>
   );
 };
@@ -157,7 +154,7 @@ const MONTH_NAMES = [
 /**
  * Three headline cards:
  * - When planned: shows projected potential numbers.
- * - When implemented: dynamically tracks water harvested till now, savings this month, and remaining payback timeline.
+ * - When implemented: estimates (from average rainfall, not meters) of water collected, savings this month and remaining payback.
  */
 export const HighlightCards = ({
   harvestM3,
@@ -201,7 +198,7 @@ export const HighlightCards = ({
     const remainingCost = Math.max(0, netCost - totalSavingsTillNow);
     const remainingYears = annualSavings > 0 ? remainingCost / annualSavings : null;
 
-    // Twelve months from the installation month: elapsed time is "Actual",
+    // Twelve months from the installation month: elapsed time is "Estimated",
     // the rest of each month (and later months) is "Projected"
     let cumulativeSavings = 0;
     const records: MonthlyRecord[] = Array.from({ length: 12 }, (_, k) => {
@@ -220,7 +217,7 @@ export const HighlightCards = ({
         harvestLitres: Math.round(mHarvest * 1000),
         savings: mSavings,
         cumulativeSavings,
-        status: elapsed ? "Actual" : "Projected",
+        status: elapsed ? "Estimated" : "Projected",
       };
     });
 
@@ -269,22 +266,22 @@ export const HighlightCards = ({
     return (
       <>
         <motion.div initial="hidden" animate="show" variants={stagger(0.1)} className="grid gap-4 md:grid-cols-3">
-          {/* 1. Water harvested till now */}
+          {/* 1. Estimated water collected since installation */}
           <Card
             gradient="bg-blue-600"
             icon={<Droplets className="h-6 w-6 text-cyan-200" />}
-            label="Water harvested till now"
+            label="Estimated water collected"
             value={`${(dynamicStats.harvestedTillNowM3 * 1000).toLocaleString(locale, { maximumFractionDigits: dynamicStats.harvestedTillNowM3 < 1 ? 1 : 0, minimumFractionDigits: dynamicStats.harvestedTillNowM3 < 1 ? 1 : 0 })} L`}
             sub={`${t(`live.since.${dynamicStats.elapsed.unit}`, { count: dynamicStats.elapsed.value })} · ${dynamicStats.harvestedTillNowM3.toFixed(2)} m³`}
             tip={t("live.sinceTip", { when: dynamicStats.startDate.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) })}
-            tag="Live Tracking"
+            tag="Estimate"
           />
 
           {/* 2. Money saved this month (clickable to open monthly report dialog) */}
           <Card
             gradient="bg-emerald-600"
             icon={<PiggyBank className="h-6 w-6 text-emerald-200" />}
-            label="Money saved this month"
+            label="Estimated savings this month"
             value={formatCurrency(dynamicStats.savedThisMonth)}
             sub={`Total ${formatCurrency(dynamicStats.totalSavingsTillNow)} saved · Click for monthly report ↗`}
             tip="Click to view full month-by-month harvest statement and download PDF report."
@@ -296,15 +293,15 @@ export const HighlightCards = ({
           <Card
             gradient="bg-teal-600"
             icon={<CalendarClock className="h-6 w-6 text-teal-200" />}
-            label="Paid off in"
+            label="Estimated payback in"
             value={dynamicStats.remainingYears !== null ? `${dynamicStats.remainingYears.toFixed(1)} years` : "N/A"}
             sub={`₹${Math.round(dynamicStats.remainingCost).toLocaleString(locale)} remaining of ${formatCurrency(dynamicStats.netCost)} cost`}
             tip="Estimated remaining time to break even based on initial investment minus cumulative savings."
-            tag={subsidyAmount > 0 ? "with subsidy" : "ROI on track"}
+            tag={subsidyAmount > 0 ? "with subsidy" : "Estimate"}
           />
         </motion.div>
 
-        {/* Live since installation: where the rain went, updating continuously */}
+        {/* Estimated since installation: where the rain went, recalculated continuously */}
         <LiveFlow
           collectedM3={dynamicStats.harvestedTillNowM3}
           usedM3={dynamicStats.usedM3}

@@ -10,7 +10,7 @@ export interface MonthlyRecord {
   harvestLitres: number;
   savings: number;
   cumulativeSavings: number;
-  status: "Actual" | "Projected";
+  status: "Estimated" | "Projected";
 }
 
 export interface MonthlyReportData {
@@ -47,7 +47,7 @@ export const buildMonthlyReportHtml = (data: MonthlyReportData): string => {
       <td style="padding: 10px 12px; font-weight: 600; border-bottom: 1px solid #e2e8f0;">${escapeHtml(r.monthName)}</td>
       <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #e2e8f0;">
         <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; background: ${
-          r.status === "Actual" ? "#dcfce7; color: #15803d" : "#f1f5f9; color: #64748b"
+          r.status === "Estimated" ? "#dcfce7; color: #15803d" : "#f1f5f9; color: #64748b"
         };">
           ${r.status}
         </span>
@@ -152,7 +152,7 @@ export const buildMonthlyReportHtml = (data: MonthlyReportData): string => {
 
   <div class="metrics">
     <div class="metric-card">
-      <div class="metric-label">Harvested Till Now</div>
+      <div class="metric-label">Estimated Collected So Far</div>
       <div class="metric-val" style="color: #0284c7;">${totalHarvestLitres.toLocaleString("en-IN")} L</div>
       <div class="metric-sub">${(totalHarvestLitres / 1000).toFixed(2)} m³ collected</div>
     </div>

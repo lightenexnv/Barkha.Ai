@@ -157,7 +157,7 @@ export const AssessmentResult = ({ result, input }: AssessmentResultProps) => {
     if (next) {
       toast({
         title: "Confirmed as Implemented! 🎉",
-        description: "Your active system metrics are now displayed submerged under the 3D model on the home page.",
+        description: "Estimated water and savings since installation now show on the home page. These are estimates based on average rainfall.",
       });
     } else {
       toast({
