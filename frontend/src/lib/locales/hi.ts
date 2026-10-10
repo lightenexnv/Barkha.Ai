@@ -298,4 +298,11 @@ export const hi: Translations = {
   "live.todayLower": "आज",
   "live.tomorrowLower": "कल",
   "live.onDay": "{day} को",
+  "replay.title": "बारिश रीप्ले",
+  "replay.subtitle": "देखिए आपके इलाके की असली बारिश साल भर में आपकी टंकी कैसे भरती है।",
+  "replay.rainThisMonth": "{mm} मिमी बारिश",
+  "replay.tank": "टंकी",
+  "replay.collected": "अब तक जमा बारिश",
+  "replay.used": "घर में इस्तेमाल",
+  "replay.recharged": "ज़मीन में भेजा गया",
 };

@@ -9,6 +9,19 @@ import * as THREE from "three";
 
 type Vec3 = [number, number, number];
 
+/**
+ * Optional live inputs for the "Rain Replay": when given, the tank level, rain
+ * density and recharge activity follow these values (0-1) instead of the
+ * hero's idle loop. A ref is used so the scene can be driven every frame
+ * without re-rendering React.
+ */
+export interface ReplayState {
+  tank: number;
+  rain: number;
+  recharge: number;
+}
+export type ReplayRef = { current: ReplayState };
+
 const COLORS = {
   grass: "#8cc152",
   grassEdge: "#76ad3f",
@@ -246,12 +259,14 @@ function FilterUnit() {
   );
 }
 
-function StorageTank({ animate }: { animate: boolean }) {
+function StorageTank({ animate, replay }: { animate: boolean; replay?: ReplayRef }) {
   const water = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
     if (!water.current) return;
-    const level = animate ? 0.55 + 0.3 * Math.sin(clock.elapsedTime * 0.35) : 0.7;
+    const level = replay
+      ? Math.max(0.01, Math.min(1, replay.current.tank))
+      : animate ? 0.55 + 0.3 * Math.sin(clock.elapsedTime * 0.35) : 0.7;
     water.current.scale.y = level;
     water.current.position.y = 0.06 + (1.85 * level) / 2;
   });
@@ -291,15 +306,16 @@ function StorageTank({ animate }: { animate: boolean }) {
   );
 }
 
-function RechargePit({ animate }: { animate: boolean }) {
+function RechargePit({ animate, replay }: { animate: boolean; replay?: ReplayRef }) {
   const ripple = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
     const mesh = ripple.current;
     if (!mesh) return;
-    const p = animate ? (clock.elapsedTime * 0.45) % 1 : 0.5;
+    const activity = replay ? replay.current.recharge : 1;
+    const p = animate ? (clock.elapsedTime * (0.25 + 0.6 * activity)) % 1 : 0.5;
     mesh.scale.setScalar(0.15 + p * 0.85);
-    (mesh.material as THREE.MeshBasicMaterial).opacity = 0.7 * (1 - p);
+    (mesh.material as THREE.MeshBasicMaterial).opacity = 0.7 * (1 - p) * (replay ? Math.min(1, activity * 1.5) : 1);
   });
 
   return (
@@ -410,7 +426,7 @@ function Cloud() {
 
 const RAIN_COUNT = 220;
 
-function Rain({ animate }: { animate: boolean }) {
+function Rain({ animate, replay }: { animate: boolean; replay?: ReplayRef }) {
   const mesh = useRef<THREE.InstancedMesh>(null);
 
   const drops = useMemo(
@@ -430,8 +446,15 @@ function Rain({ animate }: { animate: boolean }) {
     const m = mesh.current;
     if (!m) return;
     const top = 5.9;
+    // In a replay only a share of the drops fall, following that month's rain
+    const visible = replay ? Math.round(RAIN_COUNT * Math.max(0, Math.min(1, replay.current.rain))) : RAIN_COUNT;
     for (let i = 0; i < RAIN_COUNT; i++) {
       const d = drops[i];
+      if (i >= visible) {
+        matrix.makeTranslation(0, -100, 0);
+        m.setMatrixAt(i, matrix);
+        continue;
+      }
       const range = top - d.floor;
       const travel = ((clock.elapsedTime * d.speed) / range + d.offset) % 1;
       matrix.makeTranslation(d.x, top - travel * range, d.z);
@@ -486,7 +509,17 @@ const PIPES: Vec3[][] = [
   ],
 ];
 
-export function RainwaterIsland({ animate, showLabels }: { animate: boolean; showLabels: boolean }) {
+export function RainwaterIsland({
+  animate,
+  showLabels,
+  replay,
+  tankDetail = "15,000 L / yr",
+}: {
+  animate: boolean;
+  showLabels: boolean;
+  replay?: ReplayRef;
+  tankDetail?: string;
+}) {
   const lightTarget = useMemo(() => new THREE.Object3D(), []);
 
   return (
@@ -511,8 +544,8 @@ export function RainwaterIsland({ animate, showLabels }: { animate: boolean; sho
       <Ground />
       <House />
       <FilterUnit />
-      <StorageTank animate={animate} />
-      <RechargePit animate={animate} />
+      <StorageTank animate={animate} replay={replay} />
+      <RechargePit animate={animate} replay={replay} />
       <OpenSpace />
       <Tree position={[4.05, 0, -2.85]} />
       <Tree position={[-4.3, 0, 2.75]} scale={0.62} />
@@ -525,13 +558,13 @@ export function RainwaterIsland({ animate, showLabels }: { animate: boolean; sho
         <Pipe key={i} points={points} animate={animate} />
       ))}
       <Cloud />
-      <Rain animate={animate} />
+      <Rain animate={animate} replay={replay} />
 
       {showLabels && (
         <>
           <Label position={[-2.6, 3.35, -1]} title="Rooftop catchment" tone="#ee8a5f" />
           <Label position={[1.2, 1.15, 1.9]} title="Filter unit" tone="#7d8f99" />
-          <Label position={[2.9, 2.75, 0.9]} title="Storage tank" detail="15,000 L / yr" tone="#2ba3dc" />
+          <Label position={[2.9, 2.75, 0.9]} title="Storage tank" detail={tankDetail} tone="#2ba3dc" />
           <Label position={[3.6, 0.7, 3.0]} title="Recharge pit" tone="#2f86b5" />
           <Label position={[1.9, 0.55, -2.1]} title="Open space" tone="#8cc152" />
         </>

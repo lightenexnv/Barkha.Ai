@@ -501,6 +501,20 @@ export const en = {
   "live.todayLower": "today",
   "live.tomorrowLower": "tomorrow",
   "live.onDay": "on {day}",
+  "replay.title": "Rain Replay",
+  "replay.subtitle": "Watch a year of your area's real rain fill your tank.",
+  "replay.tip": "Uses your area's average rain for each month and your daily water use. The tank fills with rain, you use from it, and extra water goes into the recharge pit. Drag the picture to turn it.",
+  "replay.rainThisMonth": "{mm} mm of rain",
+  "replay.tank": "Tank",
+  "replay.collected": "Rain collected so far",
+  "replay.used": "Used at home",
+  "replay.recharged": "Sent into the ground",
+  "replay.noTank": "No tank",
+  "replay.no3d": "3D view is not supported on this device.",
+  "replay.play": "Play",
+  "replay.pause": "Pause",
+  "replay.restart": "Start the year again",
+  "replay.months": "Pick a month",
 } as const;
 
 export type TranslationKey = keyof typeof en;
