@@ -76,6 +76,8 @@ def _mosaic(latitude: float, longitude: float, zoom: int) -> Tuple[np.ndarray, i
         tiles = list(pool.map(lambda c: _fetch_tile(zoom, c[0], c[1]), coords))
     if any(t is None for t in tiles):
         raise RoofDetectionError("Satellite imagery could not be downloaded for this location.")
+    if any(_is_placeholder_tile(t) for t in tiles):
+        raise RoofDetectionError("No high-resolution imagery here at this zoom.")
 
     side = (2 * GRID_RADIUS + 1) * TILE_SIZE
     canvas = Image.new("RGB", (side, side))
@@ -88,10 +90,19 @@ def _mosaic(latitude: float, longitude: float, zoom: int) -> Tuple[np.ndarray, i
     return image, origin_x, origin_y
 
 
-def _is_placeholder(image: np.ndarray) -> bool:
-    """Esri serves a flat grey 'map data not yet available' tile where it has no imagery."""
-    centre = image[TILE_SIZE:2 * TILE_SIZE, TILE_SIZE:2 * TILE_SIZE]
-    return float(centre.std()) < 6.0
+@lru_cache(maxsize=1024)
+def _is_placeholder_tile(data: bytes) -> bool:
+    """
+    Where a zoom level has no imagery, Esri still answers HTTP 200 with a flat
+    grey "Map data not yet available" tile. About 94% of its pixels share one
+    grey value; real imagery, even a bare field, stays far below 50%.
+    """
+    try:
+        grey = np.asarray(Image.open(BytesIO(data)).convert("L"))
+    except Exception:
+        return True
+    _, counts = np.unique(grey, return_counts=True)
+    return counts.max() / grey.size > 0.5
 
 
 def _component_at(mask: np.ndarray, seed: Tuple[int, int]) -> np.ndarray:
@@ -217,14 +228,12 @@ def _polygon_area(points: np.ndarray) -> float:
 
 def detect_roof(latitude: float, longitude: float) -> Dict[str, Any]:
     last_error: Optional[Exception] = None
-    for zoom in (19, 18):
+    # Coverage depth varies by place; use the deepest level with real imagery
+    for zoom in (19, 18, 17):
         try:
             image, origin_x, origin_y = _mosaic(latitude, longitude, zoom)
         except RoofDetectionError as e:
             last_error = e
-            continue
-        if _is_placeholder(image):
-            last_error = RoofDetectionError("No high-resolution imagery here at this zoom.")
             continue
         try:
             return _detect_in_image(image, origin_x, origin_y, latitude, longitude, zoom)

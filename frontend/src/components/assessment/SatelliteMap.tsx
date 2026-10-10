@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { MapContainer, Marker, Polygon, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
 import type { LatLon } from "@/lib/geo";
+import { deepestImageryZoom, MAX_IMAGERY_ZOOM } from "@/lib/imagery";
 
 // One continuous, seamless satellite canvas (Esri World Imagery tiles, the
 // same source the roof detector segments), with a place-name overlay.
@@ -12,6 +13,45 @@ const LABELS_URL =
   "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
 const ATTRIBUTION =
   'Imagery &copy; <a href="https://www.esri.com">Esri</a>, Maxar, Earthstar Geographics &middot; Labels &copy; Esri';
+
+/** How far past the deepest real imagery the user may zoom (the tiles are enlarged). */
+const OVERZOOM_LEVELS = 2;
+
+/**
+ * Keeps the imagery layer's native zoom at the deepest level that really has
+ * imagery around the map centre, so deeper zooms enlarge real tiles instead
+ * of showing Esri's "Map data not yet available" placeholders.
+ */
+const NativeZoomController = ({ onChange }: { onChange: (zoom: number) => void }) => {
+  const map = useMap();
+  useEffect(() => {
+    let controller: AbortController | null = null;
+    let timer = 0;
+    const check = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(async () => {
+        controller?.abort();
+        controller = new AbortController();
+        const { lat, lng } = map.getCenter();
+        try {
+          const native = await deepestImageryZoom(lat, lng, controller.signal);
+          onChange(native);
+          map.setMaxZoom(Math.min(21, native + OVERZOOM_LEVELS));
+        } catch {
+          // Availability unknown (offline/blocked): keep the current setting
+        }
+      }, 250);
+    };
+    check();
+    map.on("moveend", check);
+    return () => {
+      map.off("moveend", check);
+      window.clearTimeout(timer);
+      controller?.abort();
+    };
+  }, [map, onChange]);
+  return null;
+};
 
 const pinIcon = L.divIcon({
   className: "barkha-pin",
@@ -144,6 +184,7 @@ export const SatelliteMap = ({
   className,
   children,
 }: SatelliteMapProps) => {
+  const [nativeZoom, setNativeZoom] = useState(MAX_IMAGERY_ZOOM);
   const polygonStyle = useMemo<L.PathOptions>(
     () => ({
       color: polygonTone === "adjusted" ? "#f59e0b" : "#22d3ee",
@@ -168,8 +209,10 @@ export const SatelliteMap = ({
         className="h-full w-full"
         attributionControl
       >
-        <TileLayer url={IMAGERY_URL} attribution={ATTRIBUTION} maxNativeZoom={19} maxZoom={21} />
-        <TileLayer url={LABELS_URL} maxNativeZoom={19} maxZoom={21} opacity={0.85} />
+        {/* Keyed by native zoom: Leaflet reads maxNativeZoom only when a layer is created */}
+        <TileLayer key={`img-${nativeZoom}`} url={IMAGERY_URL} attribution={ATTRIBUTION} maxNativeZoom={nativeZoom} maxZoom={21} />
+        <TileLayer key={`lbl-${nativeZoom}`} url={LABELS_URL} maxNativeZoom={nativeZoom} maxZoom={21} opacity={0.85} />
+        <NativeZoomController onChange={setNativeZoom} />
         <ClickHandler onPick={onPick} />
         <FocusController focus={focus} />
         <SizeWatcher />
