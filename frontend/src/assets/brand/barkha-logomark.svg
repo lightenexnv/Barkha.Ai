@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Barkha.Ai">
+  <defs>
+    <linearGradient id="bk-grad" x1="10" y1="58" x2="54" y2="6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0A2A7A"/>
+      <stop offset="0.55" stop-color="#1166D6"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#bk-grad)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Stem: the conduit rising from the ground node -->
+    <path d="M16 55V11" stroke-width="7"/>
+    <!-- Upper bowl -->
+    <path d="M16 11h13.5a9.5 9.5 0 0 1 0 19H16" stroke-width="7"/>
+    <!-- Lower bowl -->
+    <path d="M16 30h16a12 12 0 0 1 0 24H16" stroke-width="7"/>
+    <!-- Circuit trace climbing out of the lower bowl -->
+    <path d="M26 42h6l6-6v-6l9-9" stroke-width="3"/>
+  </g>
+  <!-- Nodes -->
+  <circle cx="26" cy="42" r="3.4" fill="#22D3EE"/>
+  <circle cx="16" cy="55" r="4.2" fill="#0A2A7A"/>
+  <!-- Rising droplet at the end of the conduit -->
+  <path d="M51.5 9.5c2.9 3.4 4.4 5.9 4.4 7.9a4.4 4.4 0 0 1-8.8 0c0-2 1.5-4.5 4.4-7.9z" fill="#22D3EE"/>
+</svg>

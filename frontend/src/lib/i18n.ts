@@ -1,0 +1,331 @@
+// Lightweight localization layer. English is the source of truth: every
+// other language is a partial dictionary, and missing keys fall back to it.
+import { as } from "@/lib/locales/as";
+import { bn } from "@/lib/locales/bn";
+import { gu } from "@/lib/locales/gu";
+import { hi } from "@/lib/locales/hi";
+import { kn } from "@/lib/locales/kn";
+import { ml } from "@/lib/locales/ml";
+import { mr } from "@/lib/locales/mr";
+import { or } from "@/lib/locales/or";
+import { pa } from "@/lib/locales/pa";
+import { ta } from "@/lib/locales/ta";
+import { te } from "@/lib/locales/te";
+import { ur } from "@/lib/locales/ur";
+
+export const en = {
+  // Navigation
+  "nav.dashboard": "Dashboard",
+  "nav.newAssessment": "New Assessment",
+  "nav.satellite": "Satellite Analysis",
+  "nav.settings": "Settings",
+  "nav.startAssessment": "Start Assessment",
+  "nav.toggleMenu": "Toggle menu",
+
+  // Authentication
+  "auth.signIn": "Sign In",
+  "auth.signOut": "Sign Out",
+  "auth.myAssessments": "My Assessments",
+  "auth.modalTitle": "Sign in to Barkha.AI",
+  "auth.modalSubtitle": "Save your assessments to your account and reopen them any time.",
+  "auth.continueWithGoogle": "Continue with Google",
+  "auth.or": "or",
+  "auth.email": "Email",
+  "auth.password": "Password",
+  "auth.signInWithEmail": "Sign in with Email",
+  "auth.continueAsGuest": "Continue as Guest",
+  "auth.terms": "By continuing you agree to the Terms of Service and Privacy Policy.",
+  "auth.demoNote": "Demo sign-in: your profile and assessments are stored only in this browser.",
+  "auth.welcome": "Welcome, {name}",
+  "auth.signedOut": "You have been signed out",
+  "auth.invalidEmail": "Enter a valid email address",
+  "auth.passwordTooShort": "Password must be at least 6 characters",
+  "auth.signingIn": "Signing in...",
+  "auth.failed": "Sign-in failed. Please try again.",
+
+  // Language
+  "lang.label": "Language",
+
+  // Common
+  "common.cancel": "Cancel",
+  "common.delete": "Delete",
+  "common.view": "View",
+  "common.download": "Download",
+
+  // Assessment page
+  "page.assessTitle1": "Start Your",
+  "page.assessTitle2": "Assessment",
+  "page.assessSubtitle":
+    "Get a comprehensive rainwater harvesting feasibility analysis for your property. Our AI-powered assessment provides detailed recommendations and cost analysis.",
+  "page.notFoundInHistory": "That saved assessment could not be found in your account.",
+
+  // Assessment form
+  "form.title": "Rainwater Harvesting Assessment",
+  "form.description": "Fill in the details below to get a comprehensive feasibility analysis for your site",
+  "form.siteInfo": "Site Information",
+  "form.siteName": "Site Name",
+  "form.siteNamePlaceholder": "e.g., Residential Building, Office Complex",
+  "form.latitude": "Latitude",
+  "form.longitude": "Longitude",
+  "form.useLocation": "Use Current Location",
+  "form.roofDetails": "Roof Details",
+  "form.roofArea": "Roof Area (m²)",
+  "form.roofAreaHelp": "Total catchment area of the roof in square meters",
+  "form.roofMaterial": "Roof Material",
+  "form.roofCondition": "Roof Condition",
+  "form.siteConditions": "Site Conditions",
+  "form.soilType": "Soil Type",
+  "form.soilHelp": "Soil type affects groundwater recharge feasibility",
+  "form.rainfall": "Annual Rainfall (mm)",
+  "form.rainfallHelp": "Average annual rainfall in millimeters for your area",
+  "form.demand": "Daily Water Demand (L/day)",
+  "form.demandHelp": "Average daily water consumption in liters",
+  "form.submit": "Generate Assessment",
+  "form.submitting": "Generating Assessment...",
+  "form.selectMaterial": "Select roof material",
+  "form.selectCondition": "Select condition",
+  "form.selectSoil": "Select soil type",
+  "form.tariffNote": "Savings use your tariff of ₹{tariff}/m³ (change it in Settings).",
+
+  "material.concrete": "Concrete",
+  "material.tile": "Tile",
+  "material.metal": "Metal Sheet",
+  "material.asbestos": "Asbestos",
+  "material.thatched": "Thatched",
+  "condition.good": "Good",
+  "condition.fair": "Fair",
+  "condition.poor": "Poor",
+  "soil.sandy": "Sandy",
+  "soil.loamy": "Loamy",
+  "soil.clay": "Clay",
+  "soil.rocky": "Rocky",
+
+  // Validation
+  "val.siteName": "Site name must be at least 2 characters",
+  "val.latitude": "Latitude must be between -90 and 90",
+  "val.longitude": "Longitude must be between -180 and 180",
+  "val.roofArea": "Roof area must be positive",
+  "val.rainfall": "Rainfall cannot be negative",
+  "val.demand": "Water demand must be positive",
+
+  // Toasts
+  "toast.assessmentComplete": "Assessment Complete!",
+  "toast.assessmentCompleteDesc": "Your rainwater harvesting assessment has been generated successfully.",
+  "toast.assessmentSaved": "Saved to your account.",
+  "toast.assessmentFailed": "Assessment Failed",
+  "toast.assessmentFailedDesc": "There was an error processing your assessment. Please try again.",
+  "toast.locationUpdated": "Location Updated",
+  "toast.locationUpdatedDesc": "Your current location has been set.",
+  "toast.locationError": "Location Error",
+  "toast.locationErrorDesc": "Could not get your location. Please enter manually.",
+  "toast.locationUnsupported": "Geolocation is not supported by your browser.",
+
+  // Results
+  "result.title1": "Assessment",
+  "result.title2": "Results",
+  "result.subtitle": "Comprehensive analysis for rainwater harvesting feasibility",
+  "result.newAssessment": "New Assessment",
+  "result.downloadReport": "Download Report",
+  "result.downloadPdf": "Download PDF Report",
+  "result.downloadTxt": "Download Text Summary",
+  "result.downloadZip": "Download Both (ZIP)",
+  "result.downloading": "Preparing...",
+  "result.harvestableVolume": "Harvestable Volume",
+  "result.perYear": "per year",
+  "result.annualSavings": "Annual Savings",
+  "result.costReduction": "cost reduction",
+  "result.implementationCost": "Implementation Cost",
+  "result.oneTime": "one-time investment",
+  "result.recommendation": "Recommendation",
+  "result.basedOn": "Based on your site conditions and requirements",
+  "result.tabTechnical": "Technical Details",
+  "result.tabCosts": "Cost Analysis",
+  "result.tabBoq": "Bill of Quantities",
+  "result.tabSafety": "Safety Checks",
+  "result.storageSystem": "Storage System",
+  "result.requiredVolume": "Required Volume",
+  "result.recommendedVolume": "Recommended Volume",
+  "result.storageDuration": "Storage Duration",
+  "result.days": "{count} days",
+  "result.rechargeSystem": "Recharge System",
+  "result.pitDiameter": "Recharge Pit Diameter",
+  "result.pitDepth": "Recharge Pit Depth",
+  "result.suitability": "Suitability Score",
+  "result.costBreakdown": "Cost Breakdown",
+  "result.costBreakdownDesc": "Detailed implementation and operational costs",
+  "result.totalCost": "Total Cost",
+  "result.savingsAnalysis": "Savings Analysis",
+  "result.monthlySavings": "Monthly Savings",
+  "result.paybackPeriod": "Payback Period",
+  "result.years": "{count} years",
+  "result.boqDesc": "Detailed material and labor requirements",
+  "result.item": "Item",
+  "result.quantity": "Quantity",
+  "result.rate": "Rate",
+  "result.amount": "Amount",
+  "result.total": "Total",
+  "result.safetyTitle": "Safety & Compliance",
+  "result.safetyDesc": "Important considerations and requirements",
+  "result.guestBanner": "You are using Barkha.AI as a guest. Sign in to keep this assessment in your account.",
+  "result.unsavedBanner": "This assessment is not saved to your account yet.",
+  "result.savedBanner": "Saved to your account",
+  "result.saveToAccount": "Save to My Account",
+
+  "rec.storage_only": "Storage System Only",
+  "rec.recharge_only": "Recharge System Only",
+  "rec.hybrid": "Hybrid System (Storage + Recharge)",
+  "rec.storage_priority_hybrid": "Storage Priority Hybrid",
+  "rec.not_feasible": "Not Feasible",
+  "rec.satellite": "Satellite Analysis",
+
+  "cost.storage_tank_cost": "Storage Tank",
+  "cost.recharge_structure_cost": "Recharge Structure",
+  "cost.piping_cost": "Piping & Fittings",
+  "cost.filtration_cost": "Filtration System",
+  "cost.labor_cost": "Labor",
+  "cost.material_contingency": "Material Contingency",
+  "cost.tax": "Tax (GST)",
+
+  // Report downloads
+  "report.success": "Report downloaded",
+  "report.fromSavedData": "The server no longer had this assessment, so the report was rebuilt from your saved data.",
+  "report.offline": "The report server is unreachable. A printable report opened instead; choose \"Save as PDF\" to keep it.",
+  "report.offlineText": "The report server is unreachable, so the summary was generated in your browser.",
+  "report.failed": "Could not prepare the report. Please try again.",
+
+  // Settings
+  "settings.title": "Settings",
+  "settings.subtitle": "Personalise language, account, engineering defaults and data for Barkha.AI.",
+  "settings.tabLanguage": "Language & Region",
+  "settings.tabAccount": "Account",
+  "settings.tabEngineering": "Tariffs & Engineering",
+  "settings.tabHistory": "Saved Assessments",
+  "settings.tabAppearance": "Appearance & Data",
+  "settings.saved": "Settings saved",
+
+  "settings.languageTitle": "Display Language",
+  "settings.languageDesc": "Choose the language for menus, forms and results. Reports and backend safety notes stay in English.",
+  "settings.stateTitle": "State Preset",
+  "settings.stateDesc": "Selecting your state applies its municipal water tariff to savings calculations.",
+  "settings.statePlaceholder": "Select your state",
+  "settings.stateDefault": "National default",
+
+  "settings.accountTitle": "Account & Security",
+  "settings.accountDesc": "Manage your profile and sign-in session.",
+  "settings.guestTitle": "You are browsing as a guest",
+  "settings.guestDesc": "Every tool works without an account. Sign in to save assessments and reopen them later.",
+  "settings.memberSince": "Member since",
+  "settings.provider": "Sign-in method",
+  "settings.providerGoogle": "Google",
+  "settings.providerEmail": "Email",
+  "settings.session": "Session",
+  "settings.sessionActive": "Active on this device",
+  "settings.savedCount": "Saved assessments",
+
+  "settings.tariffTitle": "Water Tariff",
+  "settings.tariffDesc": "Used to calculate annual savings and the payback period.",
+  "settings.tariffRate": "Water tariff (₹/m³)",
+  "settings.defaultsTitle": "Assessment Defaults",
+  "settings.defaultsDesc": "Pre-filled values for new assessments.",
+  "settings.unitsTitle": "Measurement Units",
+  "settings.unitsDesc": "How areas, volumes and lengths are displayed in results.",
+  "settings.metric": "Metric (m², m³, mm, litres)",
+  "settings.imperial": "Imperial (ft², gallons, inches)",
+  "settings.hydrologyTitle": "Hydrology & Data Sources",
+  "settings.hydrologyDesc": "Preferences for rainfall data and first-flush diversion.",
+  "settings.rainfallSource": "Preferred rainfall data source",
+  "settings.sourceOpenMeteo": "Open-Meteo & IMD (Recommended)",
+  "settings.sourceNasa": "NASA POWER Satellite",
+  "settings.sourceManual": "Manual Regional Data",
+  "settings.firstFlush": "First-flush diversion: {value} mm per rain event",
+  "settings.firstFlushHelp": "Rain discarded at the start of each event to flush roof contaminants. CGWB guidance is 1–2.5 mm.",
+
+  "settings.historyTitle": "Saved Assessments",
+  "settings.historyDesc": "Assessments saved to your account on this device.",
+  "settings.historyEmpty": "No saved assessments yet. Run an assessment while signed in and it will appear here.",
+  "settings.historyGuest": "Sign in to save assessments and see them here.",
+  "settings.colSite": "Site",
+  "settings.colDate": "Date",
+  "settings.colSystem": "System",
+  "settings.colVolume": "Volume / year",
+  "settings.colSavings": "Savings / year",
+  "settings.colActions": "Actions",
+  "settings.openInForm": "Open in assessment form",
+  "settings.deleteTitle": "Delete this assessment?",
+  "settings.deleteDesc": "\"{name}\" will be removed from your account. This cannot be undone.",
+  "settings.deleted": "Assessment deleted",
+
+  "settings.appearanceTitle": "Appearance & Performance",
+  "settings.darkMode": "Dark mode",
+  "settings.darkModeDesc": "Use the dark ocean theme.",
+  "settings.animations": "3D icon animations",
+  "settings.animationsDesc": "Turn off floating icons on low-power devices.",
+  "settings.dataTitle": "Data Management & Backup",
+  "settings.dataDesc": "Export or clear what Barkha.AI stores in this browser.",
+  "settings.exportJson": "Export JSON",
+  "settings.exportCsv": "Export CSV",
+  "settings.exported": "Export downloaded",
+  "settings.clearCache": "Clear Cache",
+  "settings.clearCacheDesc": "Removes cached satellite images and temporary data. Your account and saved assessments are kept.",
+  "settings.cacheCleared": "Cache cleared",
+  "settings.wipeData": "Wipe All Local Data",
+  "settings.wipeDataDesc": "Signs you out and deletes every setting and saved assessment in this browser.",
+  "settings.wipeTitle": "Wipe all local data?",
+  "settings.wipeConfirm": "This deletes your settings, session and all saved assessments from this browser. This cannot be undone.",
+  "settings.wiped": "All local data was deleted",
+} as const;
+
+export type TranslationKey = keyof typeof en;
+export type Translations = Partial<Record<TranslationKey, string>>;
+
+export const LANGUAGES = [
+  { code: "en", name: "English", nativeName: "English" },
+  { code: "hi", name: "Hindi", nativeName: "हिन्दी" },
+  { code: "bn", name: "Bengali", nativeName: "বাংলা" },
+  { code: "te", name: "Telugu", nativeName: "తెలుగు" },
+  { code: "mr", name: "Marathi", nativeName: "मराठी" },
+  { code: "ta", name: "Tamil", nativeName: "தமிழ்" },
+  { code: "ur", name: "Urdu", nativeName: "اردو", rtl: true },
+  { code: "gu", name: "Gujarati", nativeName: "ગુજરાતી" },
+  { code: "kn", name: "Kannada", nativeName: "ಕನ್ನಡ" },
+  { code: "ml", name: "Malayalam", nativeName: "മലയാളം" },
+  { code: "or", name: "Odia", nativeName: "ଓଡ଼ିଆ" },
+  { code: "pa", name: "Punjabi", nativeName: "ਪੰਜਾਬੀ" },
+  { code: "as", name: "Assamese", nativeName: "অসমীয়া" },
+] as const;
+
+export type LanguageCode = (typeof LANGUAGES)[number]["code"];
+
+const dictionaries: Record<LanguageCode, Translations> = {
+  en,
+  hi,
+  bn,
+  te,
+  mr,
+  ta,
+  ur,
+  gu,
+  kn,
+  ml,
+  or,
+  pa,
+  as,
+};
+
+export const DEFAULT_LANGUAGE: LanguageCode = "en";
+
+export const isLanguageCode = (value: unknown): value is LanguageCode =>
+  LANGUAGES.some((language) => language.code === value);
+
+export const isRtl = (code: LanguageCode) =>
+  LANGUAGES.some((language) => language.code === code && "rtl" in language && language.rtl);
+
+export type TranslationVars = Record<string, string | number>;
+
+export const translate = (code: LanguageCode, key: TranslationKey, vars?: TranslationVars): string => {
+  const template = dictionaries[code]?.[key] ?? en[key];
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    name in vars ? String(vars[name]) : match,
+  );
+};

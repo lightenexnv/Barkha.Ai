@@ -14,3 +14,10 @@ venv/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Documentation & Prompt Artifacts
+context.md
+prompt.md
+
+# TypeScript build caches
+*.tsbuildinfo

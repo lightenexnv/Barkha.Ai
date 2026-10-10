@@ -1,348 +1,374 @@
-import math
-from typing import Dict, Any, List
-import logging
+"""
+Rooftop rainwater harvesting (RTRWH) assessment engine.
 
-logging.basicConfig(level=logging.INFO)
+Every public number in an assessment comes from `RTRWHCalculator.assess`, so the
+API, the PDF/TXT reports and the frontend all agree. Design follows CGWB's
+"Manual on Artificial Recharge of Ground Water" and IS 15797:2008 (Roof Top
+Rainwater Harvesting - Guidelines) practice; unit rates are indicative 2025
+Indian market rates inclusive of GST.
+"""
+import logging
+import math
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Sequence
+
+from services.financials import build_financial_statement
+from services.dossiers import build_dossiers, score_options
+from services.subsidies import find_subsidies
+
 logger = logging.getLogger(__name__)
 
+# Runoff coefficients (IS 15797 / CGWB manual)
+ROOF_COEFFICIENTS = {"concrete": 0.80, "tile": 0.75, "metal": 0.90, "asbestos": 0.80, "thatched": 0.55}
+# Maintenance factor applied on top of the runoff coefficient
+CONDITION_FACTORS = {"good": 1.0, "fair": 0.90, "poor": 0.75}
+# Saturated infiltration rates, mm/hr (NRCS hydrologic soil groups, Indian field values)
+SOIL_INFILTRATION = {"sandy": 30.0, "loamy": 13.0, "clay": 2.5, "rocky": 1.0}
+SOIL_LABELS = {"sandy": "sandy", "loamy": "loamy", "clay": "clayey", "rocky": "rocky / hard-rock"}
+
+# All-India mean monthly share of annual rainfall (IMD normals), used when no
+# location-specific monthly series is supplied
+DEFAULT_MONTHLY_SHARE = [0.015, 0.018, 0.025, 0.035, 0.055, 0.145, 0.240, 0.220, 0.145, 0.065, 0.025, 0.012]
+MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+FIRST_FLUSH_MM = 1.5          # diverted per rain event (IS 15797 recommends 1-2 mm)
+DESIGN_STORM_MM_PER_HR = 40   # peak hourly intensity the recharge structure must absorb
+PIT_DEPTH = 2.5
+PIT_MAX_DIAMETER = 2.0
+PIT_POROSITY = 0.40           # boulder/gravel/sand filled
+TRENCH_WIDTH = 0.8
+TRENCH_DEPTH = 1.5
+TRENCH_MAX_LENGTH = 15.0
+TRENCH_POROSITY = 0.35
+MAX_RESIDENTIAL_TANK_M3 = 100.0
+MIN_RECHARGE_RATE = 2.0       # mm/hr below which recharge is not advised
+
+VALID_CODES = ("storage_only", "recharge_only", "hybrid", "storage_priority_hybrid", "not_feasible")
+
+
+def _num(value: Any, default: float = 0.0) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
+
+
+def _clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+@dataclass
+class SiteInputs:
+    roof_area: float
+    annual_rainfall: float
+    roof_material: str
+    roof_condition: str
+    soil_type: str
+    water_demand: float            # litres per day
+    water_tariff: float            # ₹ per m³
+    monthly_rainfall: List[float]  # mm, 12 values summing to annual_rainfall
+    state: str = ""
+    district: str = ""
+    city: str = ""
+
+
 class RTRWHCalculator:
-    def __init__(self):
-        # Runoff coefficients sourced from TWDB, NRCS, and Indian standards (2025)
-        self.roof_material_coefficients = {
-            "concrete": 0.75,
-            "tile": 0.80,
-            "metal": 0.92,
-            "asbestos": 0.82,
-            "thatched": 0.60
-        }
+    """Sizing, recommendation and costing for one site."""
 
-        # Infiltration rates (mm/hr) based on NRCS and Indian soil data
-        self.soil_infiltration_rates = {
-            "sandy": 30.0,
-            "loamy": 15.0,
-            "clay": 2.5,
-            "rocky": 0.5
-        }
+    # ---------- inputs ----------
+    def normalise(self, site: Dict[str, Any], default_tariff: float) -> SiteInputs:
+        material = str(site.get("roof_material") or "concrete").strip().lower()
+        condition = str(site.get("roof_condition") or "good").strip().lower()
+        soil = str(site.get("soil_type") or "loamy").strip().lower()
+        annual = max(0.0, _num(site.get("annual_rainfall")))
+        tariff = _num(site.get("water_tariff"), default_tariff)
 
-        # First flush volume (mm) per rainfall event, based on Indian RWH guidelines
-        self.first_flush_volume = 1.5
-        self.annual_rainfall_events = 24  # Average rainfall events per year
+        monthly_raw = site.get("monthly_rainfall") or []
+        monthly = [max(0.0, _num(v)) for v in monthly_raw][:12] if len(monthly_raw) >= 12 else []
+        if monthly and sum(monthly) > 0:
+            # Keep the monthly shape but make it agree with the annual figure used
+            scale = annual / sum(monthly) if annual > 0 else 1.0
+            monthly = [v * scale for v in monthly]
+            if annual <= 0:
+                annual = sum(monthly)
+        else:
+            monthly = [annual * share for share in DEFAULT_MONTHLY_SHARE]
 
-        # Roof condition factors (estimated based on maintenance impact)
-        self.roof_condition_factors = {
-            "good": 1.0,
-            "fair": 0.85,
-            "poor": 0.70
-        }
-
-        # Porosity for recharge structures
-        self.pit_porosity = 0.40
-        self.trench_porosity = 0.30
-
-        # Structural dimensions (meters), based on Indian RWH design standards
-        self.pit_depth = 2.5
-        self.trench_width = 0.75
-        self.trench_depth = 1.25
-
-        # Cost parameters (INR, 2025 market rates adjusted for residential systems)
-        self.storage_cost_per_m3 = 10000  # RCC tank + installation (reduced from 12000)
-        self.recharge_cost_per_m2 = 2500  # Excavation + filter media (reduced from 4500)
-        self.piping_cost_per_unit = 1000  # Per m³ for storage, halved for recharge
-        self.filtration_cost = 15000  # First flush + sand filter (reduced from 20000)
-        self.labor_factor = 0.20  # 20% of major components
-        self.contingency_factor = 0.10  # 10% of materials + labor
-        self.tax_rate = 0.18  # 18% GST
-        self.max_recharge_area = 10.0  # Max recharge pit area for residential systems (m²)
-
-    def _validate_input(self, value, min_val=0, max_val=None, name="input"):
-        if not isinstance(value, (int, float)) or value < min_val or (max_val and value > max_val):
-            raise ValueError(f"Invalid {name}: {value}. Must be numeric between {min_val} and {max_val or 'inf'}.")
-
-    def calculate_harvestable_volume(self, roof_area: float, annual_rainfall: float,
-                                    roof_material: str, roof_condition: str) -> float:
-        """Calculate annual harvestable rainwater volume in m³"""
-        try:
-            self._validate_input(roof_area, min_val=0, name="roof_area")
-            self._validate_input(annual_rainfall, min_val=0, name="annual_rainfall")
-        except ValueError as e:
-            logger.error(f"Validation error in calculate_harvestable_volume: {str(e)}")
-            return 0.0
-
-        roof_material = roof_material.strip().lower() if roof_material else "concrete"
-        base_coefficient = self.roof_material_coefficients.get(roof_material, 0.75)
-        if base_coefficient == 0.75 and roof_material != "concrete":
-            logger.warning(f"Unknown roof material '{roof_material}'. Using default coefficient 0.75.")
-
-        condition_factor = self.roof_condition_factors.get(
-            roof_condition.strip().lower() if roof_condition else "fair", 0.85
+        return SiteInputs(
+            roof_area=_clamp(_num(site.get("roof_area")), 0.0, 100_000.0),
+            annual_rainfall=annual,
+            roof_material=material if material in ROOF_COEFFICIENTS else "concrete",
+            roof_condition=condition if condition in CONDITION_FACTORS else "fair",
+            soil_type=soil if soil in SOIL_INFILTRATION else "loamy",
+            water_demand=max(0.0, _num(site.get("water_demand"))),
+            water_tariff=tariff if tariff > 0 else default_tariff,
+            monthly_rainfall=monthly,
+            state=str(site.get("state") or ""),
+            district=str(site.get("district") or ""),
+            city=str(site.get("city") or ""),
         )
-        if condition_factor == 0.85 and roof_condition and roof_condition.strip().lower() not in self.roof_condition_factors:
-            logger.warning(f"Unknown roof condition '{roof_condition}'. Using default factor 0.85.")
 
-        potential_volume = roof_area * annual_rainfall * base_coefficient * condition_factor / 1000
-        first_flush_loss_per_event = roof_area * self.first_flush_volume / 1000
-        annual_first_flush_loss = first_flush_loss_per_event * self.annual_rainfall_events
+    # ---------- hydrology ----------
+    @staticmethod
+    def rain_events(annual_rainfall: float) -> int:
+        """Approximate rain events per year (≈ one per 25 mm), for first-flush losses."""
+        return int(_clamp(round(annual_rainfall / 25), 0 if annual_rainfall <= 0 else 6, 80))
 
-        harvestable = potential_volume - annual_first_flush_loss
-        logger.info(f"Harvestable volume: {harvestable:.2f} m³ for roof_area={roof_area}, rainfall={annual_rainfall}, "
-                    f"material={roof_material}, condition={roof_condition}")
-        return max(0, harvestable)
+    def harvest(self, s: SiteInputs) -> Dict[str, Any]:
+        coefficient = ROOF_COEFFICIENTS[s.roof_material]
+        condition = CONDITION_FACTORS[s.roof_condition]
+        effective = coefficient * condition
+        gross = s.roof_area * s.annual_rainfall / 1000
+        runoff = gross * effective
+        events = self.rain_events(s.annual_rainfall)
+        first_flush = min(runoff, s.roof_area * FIRST_FLUSH_MM / 1000 * events)
+        harvestable = max(0.0, runoff - first_flush)
 
-    def calculate_storage_requirement(self, daily_demand: float, rainfall_pattern: str = "uniform") -> Dict[str, float]:
-        """Calculate storage tank requirements in m³"""
-        try:
-            self._validate_input(daily_demand, min_val=0, name="daily_demand")
-        except ValueError as e:
-            logger.error(f"Validation error in calculate_storage_requirement: {str(e)}")
-            return {"required_volume": 0.0, "recommended_volume": 0.0, "storage_days": 0}
-
-        patterns = {"uniform": 45, "seasonal": 150}
-        storage_days = patterns.get(rainfall_pattern.strip().lower(), 75)
-        required_storage = daily_demand * storage_days / 1000
-        recommended_storage = required_storage * 1.25
-
-        result = {
-            "required_volume": round(required_storage, 2),
-            "recommended_volume": round(recommended_storage, 2),
-            "storage_days": storage_days
+        # Monthly harvest keeps the annual total exact
+        monthly = [harvestable * (m / s.annual_rainfall) if s.annual_rainfall > 0 else 0.0 for m in s.monthly_rainfall]
+        return {
+            "gross_rainfall_volume": gross,
+            "runoff_coefficient": coefficient,
+            "condition_factor": condition,
+            "effective_coefficient": effective,
+            "rain_events": events,
+            "first_flush_loss": first_flush,
+            "harvestable_volume": harvestable,
+            "monthly_harvest": monthly,
         }
-        logger.info(f"Storage requirements: {result}")
-        return result
 
-    def calculate_recharge_structure(self, soil_type: str, available_volume: float, available_space: float) -> Dict[str, Any]:
-        """Calculate artificial recharge structure requirements with space constraint"""
-        try:
-            self._validate_input(available_volume, min_val=0, name="available_volume")
-            self._validate_input(available_space, min_val=0, max_val=1000, name="available_space")
-        except ValueError as e:
-            logger.error(f"Validation error in calculate_recharge_structure: {str(e)}")
+    @staticmethod
+    def _simulate(capacity: float, monthly_inflow: Sequence[float], monthly_demand: Sequence[float]) -> Dict[str, float]:
+        """Monthly tank mass balance; the second year is reported so the start level doesn't matter."""
+        level, supplied, overflow = capacity / 2, 0.0, 0.0
+        for year in range(2):
+            supplied, overflow = 0.0, 0.0
+            for inflow, demand in zip(monthly_inflow, monthly_demand):
+                level += inflow
+                if level > capacity:
+                    overflow += level - capacity
+                    level = capacity
+                use = min(level, demand)
+                level -= use
+                supplied += use
+        return {"supplied": supplied, "overflow": overflow}
+
+    def size_storage(self, s: SiteInputs, monthly_harvest: List[float]) -> Dict[str, Any]:
+        annual_demand = s.water_demand * 365 / 1000
+        harvestable = sum(monthly_harvest)
+        if annual_demand <= 0 or harvestable <= 0:
             return {
-                "recharge_pit": {"diameter": 0.0, "depth": self.pit_depth, "area": 0.0},
-                "recharge_trench": {"length": 0.0, "width": self.trench_width, "depth": self.trench_depth},
-                "infiltration_rate": 0.0,
-                "suitability_score": 0.0
+                "required_volume": 0.0, "recommended_volume": 0.0, "storage_days": 0,
+                "annual_supply": 0.0, "demand_coverage": 0.0, "annual_demand": annual_demand,
+                "overflow_to_recharge": harvestable,
             }
 
-        soil_type = soil_type.strip().lower() if soil_type else "clay"
-        infiltration_rate = self.soil_infiltration_rates.get(soil_type, 1.0)
-        if infiltration_rate == 1.0 and soil_type not in self.soil_infiltration_rates:
-            logger.warning(f"Unknown soil type '{soil_type}'. Using default infiltration rate 1.0.")
+        monthly_demand = [s.water_demand * days / 1000 for days in MONTH_DAYS]
+        ceiling = min(MAX_RESIDENTIAL_TANK_M3, max(harvestable, 1.0))
+        best = self._simulate(ceiling, monthly_harvest, monthly_demand)["supplied"]
 
-        # Cap recharge area based on available space and max residential limit
-        required_area = available_volume / (self.pit_depth * self.pit_porosity) if available_volume > 0 else 0
-        capped_area = min(required_area, available_space, self.max_recharge_area)
-        if capped_area < required_area:
-            logger.info(f"Recharge area capped from {required_area:.2f} m² to {capped_area:.2f} m² due to space constraints.")
+        # Grow the tank in 0.5 m³ steps while the extra capacity still earns its keep:
+        # stop at 90% of what an unlimited tank could supply, or once another
+        # 0.5 m³ adds less than 2 m³/year (each m³ of tank should cycle ≥ 4 times a year)
+        required = 0.5
+        supplied = self._simulate(required, monthly_harvest, monthly_demand)["supplied"]
+        while required < ceiling and supplied < 0.9 * best:
+            gain = self._simulate(required + 0.5, monthly_harvest, monthly_demand)["supplied"] - supplied
+            if gain < 2.0:
+                break
+            required += 0.5
+            supplied += gain
 
-        pit_diameter = math.sqrt(capped_area * 4 / math.pi) if capped_area > 0 else 0
-        trench_length = available_volume / (self.trench_width * self.trench_depth * self.trench_porosity) if available_volume > 0 else 0
-
-        result = {
-            "recharge_pit": {
-                "diameter": round(pit_diameter, 2),
-                "depth": self.pit_depth,
-                "area": round(capped_area, 2)
-            },
-            "recharge_trench": {
-                "length": round(trench_length, 2),
-                "width": self.trench_width,
-                "depth": self.trench_depth
-            },
-            "infiltration_rate": infiltration_rate,
-            "suitability_score": min(10, infiltration_rate / 3)
-        }
-        logger.info(f"Recharge structure: {result}")
-        return result
-
-    def recommend_best_option(self, harvestable_volume: float, daily_demand: float,
-                             soil_type: str, available_space: float) -> str:
-        """Recommend the best RTRWH option"""
-        try:
-            self._validate_input(harvestable_volume, min_val=0, name="harvestable_volume")
-            self._validate_input(daily_demand, min_val=0, name="daily_demand")
-            self._validate_input(available_space, min_val=0, max_val=1000, name="available_space")
-        except ValueError as e:
-            logger.error(f"Validation error in recommend_best_option: {str(e)}")
-            return "not_feasible"
-
-        annual_demand = daily_demand * 365 / 1000
-        storage_viable = harvestable_volume >= annual_demand * 0.4
-        soil_type = soil_type.strip().lower() if soil_type else "clay"
-        infiltration_rate = self.soil_infiltration_rates.get(soil_type, 1.0)
-        recharge_viable = infiltration_rate > 2.0 and available_space >= 5  # Reduced threshold for residential
-
-        recommendation = (
-            "hybrid" if storage_viable and recharge_viable and harvestable_volume > annual_demand * 0.7
-            else "storage_priority_hybrid" if storage_viable and recharge_viable
-            else "storage_only" if storage_viable
-            else "recharge_only" if recharge_viable
-            else "not_feasible"
-        )
-        logger.info(f"Recommendation: {recommendation} (harvestable_volume={harvestable_volume}, "
-                    f"daily_demand={daily_demand}, soil_type={soil_type}, available_space={available_space})")
-        return recommendation
-
-    def calculate_costs(self, recommendation: str, storage_volume: float,
-                        recharge_area: float) -> Dict[str, float]:
-        """Calculate implementation costs in INR with detailed breakdown"""
-        try:
-            self._validate_input(storage_volume, min_val=0, name="storage_volume")
-            self._validate_input(recharge_area, min_val=0, name="recharge_area")
-        except ValueError as e:
-            logger.error(f"Validation error in calculate_costs: {str(e)}")
-            return {
-                "storage_tank_cost": 0.0,
-                "recharge_structure_cost": 0.0,
-                "piping_cost": 0.0,
-                "filtration_cost": 0.0,
-                "labor_cost": 0.0,
-                "material_contingency": 0.0,
-                "tax": 0.0,
-                "total_cost": 0.0
-            }
-
-        costs = {
-            "storage_tank_cost": 0.0,
-            "recharge_structure_cost": 0.0,
-            "piping_cost": 0.0,
-            "filtration_cost": 0.0,
-            "labor_cost": 0.0,
-            "material_contingency": 0.0,
-            "tax": 0.0,
-            "total_cost": 0.0
+        # Round up to a standard tank size
+        standard = [1, 1.5, 2, 3, 5, 7.5, 10, 12.5, 15, 20, 25, 30, 40, 50, 60, 75, 100]
+        recommended = next((size for size in standard if size >= required), math.ceil(required))
+        run = self._simulate(recommended, monthly_harvest, monthly_demand)
+        return {
+            "required_volume": round(required, 2),
+            "recommended_volume": float(recommended),
+            "storage_days": int(round(recommended * 1000 / s.water_demand)) if s.water_demand > 0 else 0,
+            "annual_supply": run["supplied"],
+            "demand_coverage": run["supplied"] / annual_demand if annual_demand > 0 else 0.0,
+            "annual_demand": annual_demand,
+            "overflow_to_recharge": run["overflow"],
         }
 
-        recommendation = recommendation.strip().lower() if recommendation else "not_feasible"
-        valid_recommendations = ["storage_only", "recharge_only", "hybrid", "storage_priority_hybrid", "not_feasible"]
-        if recommendation not in valid_recommendations:
-            logger.warning(f"Invalid recommendation '{recommendation}'. Defaulting to 'not_feasible'.")
-            recommendation = "not_feasible"
+    def size_recharge(self, s: SiteInputs, effective_coefficient: float) -> Dict[str, Any]:
+        rate_mm_hr = SOIL_INFILTRATION[s.soil_type]
+        k = rate_mm_hr / 1000  # m/hr
+        # Runoff from one hour of design-storm rain must be held + infiltrated within that hour
+        design_runoff = s.roof_area * DESIGN_STORM_MM_PER_HR / 1000 * effective_coefficient
 
-        logger.info(f"Calculating costs for recommendation: {recommendation}, "
-                    f"storage_volume: {storage_volume} m³, recharge_area: {recharge_area} m²")
+        # Recharge pit: storage in voids + infiltration through base and sides
+        def pit_capacity(diameter: float) -> float:
+            area = math.pi * diameter ** 2 / 4
+            wetted = area + math.pi * diameter * PIT_DEPTH
+            return area * PIT_DEPTH * PIT_POROSITY + wetted * k
 
-        if recommendation != "not_feasible":
-            storage_keywords = ["storage_only", "hybrid", "storage_priority_hybrid"]
-            if any(recommendation == keyword for keyword in storage_keywords):
-                if storage_volume <= 0:
-                    logger.warning("Storage volume is zero or negative. Skipping storage-related costs.")
-                else:
-                    costs["storage_tank_cost"] = storage_volume * self.storage_cost_per_m3
-                    costs["piping_cost"] += storage_volume * self.piping_cost_per_unit
-                    costs["filtration_cost"] = self.filtration_cost
-                    logger.info(f"Storage costs: tank={costs['storage_tank_cost']}, "
-                                f"piping={costs['piping_cost']}, filtration={costs['filtration_cost']}")
+        per_pit = pit_capacity(PIT_MAX_DIAMETER)
+        pit_count = max(1, math.ceil(design_runoff / per_pit)) if design_runoff > 0 else 0
+        load = design_runoff / pit_count if pit_count else 0
+        diameter = PIT_MAX_DIAMETER
+        if pit_count == 1:
+            diameter = 1.0
+            while diameter < PIT_MAX_DIAMETER and pit_capacity(diameter) < load:
+                diameter = round(diameter + 0.1, 2)
+        pit_area = math.pi * diameter ** 2 / 4
 
-            recharge_keywords = ["recharge_only", "hybrid", "storage_priority_hybrid"]
-            if any(recommendation == keyword for keyword in recharge_keywords):
-                if recharge_area <= 0:
-                    logger.warning("Recharge area is zero or negative. Skipping recharge-related costs.")
-                else:
-                    costs["recharge_structure_cost"] = recharge_area * self.recharge_cost_per_m2
-                    costs["piping_cost"] += recharge_area * (self.piping_cost_per_unit * 0.5)
-                    logger.info(f"Recharge costs: structure={costs['recharge_structure_cost']}, "
-                                f"additional piping={recharge_area * (self.piping_cost_per_unit * 0.5)}")
+        # Recharge trench alternative
+        per_metre = TRENCH_WIDTH * TRENCH_DEPTH * TRENCH_POROSITY + (TRENCH_WIDTH + 2 * TRENCH_DEPTH) * k
+        total_length = design_runoff / per_metre if design_runoff > 0 else 0
+        trench_count = max(1, math.ceil(total_length / TRENCH_MAX_LENGTH)) if total_length > 0 else 0
+        trench_length = math.ceil(total_length / trench_count * 2) / 2 if trench_count else 0
+        trench_length = max(trench_length, 2.0) if trench_count else 0
 
-            major_components = costs["storage_tank_cost"] + costs["recharge_structure_cost"]
-            costs["labor_cost"] = major_components * self.labor_factor
-            materials_and_labor = (
-                major_components +
-                costs["piping_cost"] +
-                costs["filtration_cost"] +
-                costs["labor_cost"]
-            )
-            costs["material_contingency"] = materials_and_labor * self.contingency_factor
-            subtotal = materials_and_labor + costs["material_contingency"]
-            costs["tax"] = subtotal * self.tax_rate
-            costs["total_cost"] = subtotal + costs["tax"]
-
-        logger.info(f"Cost breakdown: {costs}")
-        return {k: round(v, 2) for k, v in costs.items()}
-
-    def calculate_savings(self, harvestable_volume: float, water_tariff: float = 25) -> Dict[str, float]:
-        """Calculate annual water savings"""
-        try:
-            self._validate_input(harvestable_volume, min_val=0, name="harvestable_volume")
-            self._validate_input(water_tariff, min_val=0, name="water_tariff")
-        except ValueError as e:
-            logger.error(f"Validation error in calculate_savings: {str(e)}")
-            return {
-                "annual_water_saved": 0.0,
-                "annual_cost_savings": 0.0,
-                "monthly_savings": 0.0,
-                "water_tariff_used": water_tariff
-            }
-
-        annual_savings = harvestable_volume * water_tariff
-        result = {
-            "annual_water_saved": round(harvestable_volume, 2),
-            "annual_cost_savings": round(annual_savings, 2),
-            "monthly_savings": round(annual_savings / 12, 2),
-            "water_tariff_used": water_tariff
+        # Annual recharge capacity is limited by soil, not by the structure volume
+        suitability = _clamp(rate_mm_hr / 30 * 10, 0, 10)
+        return {
+            "recharge_pit": {"diameter": round(diameter, 2), "depth": PIT_DEPTH, "area": round(pit_area, 2), "count": pit_count},
+            "recharge_trench": {"length": round(trench_length, 2), "width": TRENCH_WIDTH, "depth": TRENCH_DEPTH, "count": trench_count},
+            "infiltration_rate": rate_mm_hr,
+            "design_runoff": round(design_runoff, 2),
+            "suitability_score": round(suitability, 1),
+            "recharge_feasible": rate_mm_hr >= MIN_RECHARGE_RATE,
         }
-        logger.info(f"Savings: {result}")
-        return result
 
-    def safety_checks(self, site_data: Dict[str, Any]) -> List[str]:
-        """Perform safety and compliance checks"""
-        if not isinstance(site_data, dict):
-            logger.error("site_data must be a dictionary.")
-            return ["ERROR: Invalid site_data format. Must be a dictionary."]
+    # ---------- decision ----------
+    @staticmethod
+    def recommend(scores: Dict[str, int], harvestable: float, surplus_share: float) -> Dict[str, Any]:
+        """Pick the best-scoring option; returns the API code and the recharge structure to cost."""
+        best = max(scores, key=lambda key: (scores[key], key == "hybrid"))
+        if harvestable < 1.0 or scores[best] < 30:
+            return {"code": "not_feasible", "recharge_kind": None, "best": best}
+        if best == "storage":
+            return {"code": "storage_only", "recharge_kind": None, "best": best}
+        kind = "trench" if scores["recharge_trench"] > scores["recharge_pit"] else "pit"
+        if best == "hybrid":
+            return {"code": "hybrid" if surplus_share >= 0.35 else "storage_priority_hybrid", "recharge_kind": kind, "best": best}
+        return {"code": "recharge_only", "recharge_kind": "trench" if best == "recharge_trench" else "pit", "best": best}
 
+    # ---------- safety ----------
+    @staticmethod
+    def safety_checks(s: SiteInputs, storage: Dict[str, Any], recharge: Dict[str, Any]) -> List[str]:
         warnings = []
-        roof_material = site_data.get("roof_material", "").strip().lower()
-        if roof_material == "asbestos":
-            warnings.append("CRITICAL: Asbestos roof detected. Water not suitable for drinking without extensive treatment.")
-
-        soil_type = site_data.get("soil_type", "").strip().lower()
-        annual_rainfall = site_data.get("annual_rainfall", 0)
-        if soil_type == "clay" and annual_rainfall > 1200:
-            warnings.append("WARNING: High clay content with heavy rainfall may cause waterlogging.")
-
-        storage_required = site_data.get("storage_required", 0)
-        if storage_required > 15:
-            warnings.append("WARNING: Large storage tank requires structural analysis and UV protection.")
-
+        if s.roof_material == "asbestos":
+            warnings.append("CRITICAL: Asbestos roof detected. Do not use harvested water for drinking or cooking; route it to recharge or non-potable uses only.")
+        if s.roof_material == "thatched":
+            warnings.append("WARNING: Thatched roofs leach organic matter. Provide a sand-charcoal filter and use the water for non-potable purposes.")
+        if s.roof_condition == "poor":
+            warnings.append("WARNING: Poor roof condition lowers yield by about 25%. Repair cracks and clean the catchment before installation.")
+        if s.soil_type == "clay" and s.annual_rainfall > 1200:
+            warnings.append("WARNING: Clay soil with heavy rainfall may cause waterlogging around recharge structures; provide an overflow to the storm drain.")
+        if not recharge["recharge_feasible"]:
+            warnings.append("WARNING: Soil infiltration is too low for effective recharge. Prioritise storage or consult a hydrogeologist about a recharge well.")
+        if storage["recommended_volume"] > 15:
+            warnings.append("WARNING: Tanks above 15 m³ need a structural design check, a lockable manhole and UV-stable construction.")
+        if s.annual_rainfall < 400:
+            warnings.append("WARNING: Low annual rainfall; expect long dry spells and size demand expectations accordingly.")
         warnings.extend([
-            "REQUIRED: Install first-flush diverter to remove initial contaminated water.",
-            "REQUIRED: Ensure proper overflow and drainage to prevent structural damage.",
-            "RECOMMENDED: Regularly test harvested water for pH, bacteria, and contaminants.",
-            "RECOMMENDED: Use opaque tanks to prevent algal growth.",
-            "RECOMMENDED: Clean gutters and screens biannually."
+            "REQUIRED: Keep recharge pits at least 6 m from septic tanks, soak pits and building foundations.",
+            "REQUIRED: Install a first-flush diverter to discard the first, most contaminated runoff of every rain event.",
+            "REQUIRED: Provide an overflow from the tank and recharge structure to the storm drain.",
+            "RECOMMENDED: Test stored water for pH, turbidity and coliform bacteria before potable use.",
+            "RECOMMENDED: Use opaque, covered tanks with mosquito-proof mesh on every opening.",
+            "RECOMMENDED: Clean gutters, leaf screens and filters before and twice during the monsoon.",
         ])
-
-        logger.info(f"Safety checks: {warnings}")
         return warnings
 
-    def generate_boq(self, recommendation: str, storage_req: Dict, recharge_req: Dict, costs: Dict) -> Dict[str, Any]:
-        """Generate Bill of Quantities"""
-        if not all(isinstance(d, dict) for d in [storage_req, recharge_req, costs]):
-            logger.error("Invalid input: storage_req, recharge_req, and costs must be dictionaries.")
-            return {"items": [], "total_cost": 0.0}
+    # ---------- full assessment ----------
+    def assess(self, site: Dict[str, Any], default_tariff: float = 50.0) -> Dict[str, Any]:
+        s = self.normalise(site, default_tariff)
+        h = self.harvest(s)
+        harvestable = h["harvestable_volume"]
+        storage = self.size_storage(s, h["monthly_harvest"])
+        recharge = self.size_recharge(s, h["effective_coefficient"])
+        surplus_share = storage["overflow_to_recharge"] / harvestable if harvestable > 0 else 0.0
+        scores = score_options(s, h, storage, recharge)
+        decision = self.recommend(scores, harvestable, surplus_share)
+        recommendation = decision["code"]
 
-        boq = {"items": [], "total_cost": 0.0}
-        recommendation = recommendation.strip().lower() if recommendation else "not_feasible"
+        uses_storage = recommendation in ("storage_only", "hybrid", "storage_priority_hybrid")
+        uses_recharge = recommendation in ("recharge_only", "hybrid", "storage_priority_hybrid")
 
-        storage_keywords = ["storage_only", "hybrid", "storage_priority_hybrid"]
-        if any(recommendation == keyword for keyword in storage_keywords):
-            volume = storage_req.get("recommended_volume", 0)
-            boq["items"].extend([
-                {"item": "RCC Water Storage Tank", "quantity": f"{volume:.2f} m³", "rate": self.storage_cost_per_m3, "amount": round(volume * self.storage_cost_per_m3, 2)},
-                {"item": "First Flush Diverter", "quantity": "1 No.", "rate": 5000, "amount": 5000},
-                {"item": "Filtration System (Sand)", "quantity": "1 Set", "rate": self.filtration_cost, "amount": self.filtration_cost},
-                {"item": "PVC Piping & Fittings", "quantity": "1 Lot", "rate": costs.get("piping_cost", 0), "amount": round(costs.get("piping_cost", 0), 2)}
-            ])
+        # Water actually used from the tank, and water sent to the aquifer
+        supplied = storage["annual_supply"] if uses_storage else 0.0
+        if uses_recharge:
+            recharged = storage["overflow_to_recharge"] if uses_storage else harvestable
+        else:
+            recharged = 0.0
 
-        recharge_keywords = ["recharge_only", "hybrid", "storage_priority_hybrid"]
-        if any(recommendation == keyword for keyword in recharge_keywords):
-            pit_area = recharge_req.get("recharge_pit", {}).get("area", 0)
-            boq["items"].extend([
-                {"item": "Recharge Pit Excavation", "quantity": f"{pit_area:.2f} m²", "rate": 500, "amount": round(pit_area * 500, 2)},
-                {"item": "Filter Media (Sand & Gravel)", "quantity": f"{pit_area * 0.6:.2f} m³", "rate": 1500, "amount": round(pit_area * 0.6 * 1500, 2)},
-                {"item": "Perforated Pipe", "quantity": "20 m", "rate": 200, "amount": 4000}
-            ])
+        statement = build_financial_statement(
+            recommendation=recommendation,
+            roof_area=s.roof_area,
+            storage=storage,
+            recharge=recharge,
+            prefer_trench=decision["recharge_kind"] == "trench",
+        )
+        annual_savings = supplied * s.water_tariff
+        total = statement["total_cost"]
+        payback_years = total / annual_savings if annual_savings > 0 else None
 
-        boq["total_cost"] = sum(item["amount"] for item in boq["items"])
-        boq["total_cost"] = round(boq["total_cost"], 2)
-        logger.info(f"BOQ: {boq}")
-        return boq
+        subsidies = find_subsidies(s.state, total, s.water_tariff, supplied)
+
+        storage_req = {
+            "required_volume": storage["required_volume"],
+            "recommended_volume": storage["recommended_volume"],
+            "storage_days": storage["storage_days"],
+            "annual_supply": round(storage["annual_supply"], 2),
+            "demand_coverage": round(storage["demand_coverage"], 3),
+            "annual_demand": round(storage["annual_demand"], 2),
+        }
+        context = {
+            "inputs": s,
+            "hydrology": h,
+            "storage": storage,
+            "recharge": recharge,
+            "recommendation": recommendation,
+            "recommended_dossier": decision["best"] if recommendation != "not_feasible" else None,
+            "recharge_kind": decision["recharge_kind"],
+            "scores": scores,
+            "supplied": supplied,
+            "recharged": recharged,
+            "annual_savings": annual_savings,
+            "statement": statement,
+            "soil_label": SOIL_LABELS[s.soil_type],
+        }
+
+        return {
+            "harvestable_volume": round(harvestable, 2),
+            "recommended_option": recommendation,
+            "storage_recommendation": storage_req,
+            "recharge_recommendation": recharge,
+            "cost_analysis": statement["legacy_cost_analysis"],
+            "savings_analysis": {
+                "annual_water_saved": round(supplied, 2),
+                "annual_recharge": round(recharged, 2),
+                "annual_cost_savings": round(annual_savings, 2),
+                "monthly_savings": round(annual_savings / 12, 2),
+                "water_tariff_used": s.water_tariff,
+            },
+            "safety_checks": self.safety_checks(s, storage, recharge),
+            "bill_of_quantities": {
+                "items": [
+                    {"item": row["description"], "quantity": f"{row['quantity']:g} {row['unit']}", "rate": row["unit_price"], "amount": row["amount"]}
+                    for row in statement["materials"] + statement["additional"]
+                ],
+                "total_cost": round(statement["materials_subtotal"] + statement["additional_subtotal"], 2),
+            },
+            "payback_period": f"{payback_years:.1f}" if payback_years is not None else "N/A",
+            "financial_statement": statement,
+            "subsidies": subsidies,
+            "dossiers": build_dossiers(context),
+            "hydrology": {
+                "annual_rainfall": round(s.annual_rainfall, 1),
+                "monthly_rainfall": [round(v, 1) for v in s.monthly_rainfall],
+                "monthly_harvest": [round(v, 3) for v in h["monthly_harvest"]],
+                "runoff_coefficient": h["runoff_coefficient"],
+                "condition_factor": h["condition_factor"],
+                "first_flush_loss": round(h["first_flush_loss"], 2),
+                "rain_events": h["rain_events"],
+                "gross_rainfall_volume": round(h["gross_rainfall_volume"], 2),
+                "infiltration_rate": recharge["infiltration_rate"],
+            },
+        }

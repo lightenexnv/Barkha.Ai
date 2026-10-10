@@ -11,6 +11,11 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Upload, Download, MapPin, Calculator, AlertTriangle, CheckCircle, Info, Navigation, Home } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
+import { useReportDownload } from '@/components/ReportDownloadMenu';
+import { useAuth } from '@/context/AuthContext';
+import { saveAssessment } from '@/lib/historyService';
+import type { ReportData } from '@/lib/clientReportGenerator';
+import type { ReportFormat } from '@/lib/api';
 
 interface Coordinates {
   latitude: number;
@@ -76,9 +81,11 @@ const SatelliteAnalysis: React.FC = () => {
   ]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+  const { download, busyFormat } = useReportDownload();
 
   const updateStepStatus = (stepId: string, status: ProcessingStep['status'], message?: string) => {
-    setSteps(prev => prev.map(step => 
+    setSteps(prev => prev.map(step =>
       step.id === stepId ? { ...step, status, message } : step
     ));
   };
@@ -136,7 +143,7 @@ const SatelliteAnalysis: React.FC = () => {
     setError(null);
     setCurrentStep('Fetching satellite image...');
     setProgress(20);
-    
+
     updateStepStatus('coordinates', 'completed');
     updateStepStatus('satellite', 'processing');
 
@@ -144,7 +151,7 @@ const SatelliteAnalysis: React.FC = () => {
       const blob = await api.getSatelliteImage(coordinates.latitude, coordinates.longitude);
       const imageUrl = URL.createObjectURL(blob);
       setSatelliteImageUrl(imageUrl);
-      
+
       updateStepStatus('satellite', 'completed');
       updateStepStatus('marking', 'pending');
       setActiveTab('marking');
@@ -182,14 +189,14 @@ const SatelliteAnalysis: React.FC = () => {
     setError(null);
     setCurrentStep('Analyzing rooftop...');
     setProgress(60);
-    
+
     updateStepStatus('analysis', 'processing');
 
     try {
       const data = await api.analyzeRooftop(coordinates.latitude, coordinates.longitude, markedImageFile);
-      
+
       console.log('Analysis response:', data); // Debug logging
-      
+
       // Check if the response has the expected structure
       if (data && typeof data === 'object') {
         // Transform the response to match the expected interface
@@ -211,9 +218,32 @@ const SatelliteAnalysis: React.FC = () => {
           error: data.error || undefined,
           cv2_images: data.cv2_images || undefined
         };
-        
+
         if (transformedResult.success) {
           setAnalysisResult(transformedResult);
+          if (user) {
+            const { latitude, longitude } = coordinates;
+            saveAssessment({
+              id: `satellite_${Date.now()}`,
+              userId: user.id,
+              kind: 'satellite',
+              createdAt: new Date().toISOString(),
+              site: {
+                site_name: `Satellite site ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+                latitude,
+                longitude,
+                roof_area: transformedResult.roof_area,
+                annual_rainfall: transformedResult.rainfall_data.annual,
+              },
+              result: null,
+              satellite: {
+                roof_area: transformedResult.roof_area,
+                annual_rainfall: transformedResult.rainfall_data.annual,
+                annual_harvest_m3: transformedResult.harvest_potential.annual_harvest_cubic_meters,
+                daily_average_liters: transformedResult.harvest_potential.daily_average_liters,
+              },
+            });
+          }
           updateStepStatus('analysis', 'completed');
           updateStepStatus('results', 'completed');
           setActiveTab('results');
@@ -245,7 +275,7 @@ const SatelliteAnalysis: React.FC = () => {
     setCurrentStep('');
     setActiveTab('coordinates');
     setSteps(prev => prev.map(step => ({ ...step, status: 'pending' as const, message: undefined })));
-    
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -260,79 +290,20 @@ const SatelliteAnalysis: React.FC = () => {
     }
   };
 
-  const downloadPdfReport = async () => {
+  const downloadSatelliteReport = (format: ReportFormat) => {
     if (!analysisResult) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Get assessment ID from the analysis result or generate one
-      const assessmentId = `satellite_${coordinates.latitude}_${coordinates.longitude}_${Date.now()}`;
-      
-      const blob = await api.downloadPdfReport(assessmentId);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `RTRWH_Assessment_${coordinates.latitude}_${coordinates.longitude}.pdf`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('PDF download failed:', error);
-      setError('Failed to download PDF report. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const downloadTextReport = async () => {
-    if (!analysisResult) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Get assessment ID from the analysis result or generate one
-      const assessmentId = `satellite_${coordinates.latitude}_${coordinates.longitude}_${Date.now()}`;
-      
-      const blob = await api.downloadTextReport(assessmentId);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `RTRWH_Assessment_${coordinates.latitude}_${coordinates.longitude}.txt`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Text download failed:', error);
-      setError('Failed to download text report. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const downloadBothReports = async () => {
-    if (!analysisResult) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Get assessment ID from the analysis result or generate one
-      const assessmentId = `satellite_${coordinates.latitude}_${coordinates.longitude}_${Date.now()}`;
-      
-      const blob = await api.downloadBothReports(assessmentId);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `RTRWH_Reports_${coordinates.latitude}_${coordinates.longitude}.zip`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Reports download failed:', error);
-      setError('Failed to download reports. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    const { latitude, longitude } = coordinates;
+    const data: ReportData = {
+      site: {
+        site_name: `Satellite site ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+        latitude,
+        longitude,
+        roof_area: analysisResult.roof_area,
+        annual_rainfall: analysisResult.rainfall_data.annual,
+      },
+      result: { harvestable_volume: analysisResult.harvest_potential.annual_harvest_cubic_meters },
+    };
+    download(data, format);
   };
 
   return (
@@ -346,8 +317,8 @@ const SatelliteAnalysis: React.FC = () => {
             </p>
           </div>
           <div className="flex justify-center md:justify-end">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => window.location.href = '/'}
               className="flex items-center gap-2"
             >
@@ -458,10 +429,10 @@ const SatelliteAnalysis: React.FC = () => {
                   />
                 </div>
               </div>
-              
+
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button 
-                  onClick={getCurrentLocation} 
+                <Button
+                  onClick={getCurrentLocation}
                   disabled={loading}
                   variant="outline"
                   className="flex-1"
@@ -469,8 +440,8 @@ const SatelliteAnalysis: React.FC = () => {
                   <Navigation className="w-4 h-4 mr-2" />
                   {loading ? 'Getting Location...' : 'Use Current Location'}
                 </Button>
-                <Button 
-                  onClick={handleCoordinatesSubmit} 
+                <Button
+                  onClick={handleCoordinatesSubmit}
                   disabled={loading}
                   className="flex-1"
                 >
@@ -498,15 +469,15 @@ const SatelliteAnalysis: React.FC = () => {
                 <>
                   <div className="space-y-4">
                     <div className="text-center">
-                      <img 
-                        src={satelliteImageUrl} 
-                        alt="Satellite view" 
+                      <img
+                        src={satelliteImageUrl}
+                        alt="Satellite view"
                         className="max-w-full h-auto border rounded-lg shadow-lg mx-auto"
                         style={{ maxHeight: '400px' }}
                       />
                     </div>
-                    
-                    <Button 
+
+                    <Button
                       onClick={downloadSatelliteImage}
                       className="w-full"
                       variant="outline"
@@ -585,9 +556,9 @@ const SatelliteAnalysis: React.FC = () => {
                       Ready to analyze: {markedImageFile.name}
                     </AlertDescription>
                   </Alert>
-                  
-                  <Button 
-                    onClick={handleAnalysis} 
+
+                  <Button
+                    onClick={handleAnalysis}
                     disabled={loading}
                     className="w-full"
                   >
@@ -628,21 +599,21 @@ const SatelliteAnalysis: React.FC = () => {
                       </div>
                       <div className="text-sm text-blue-800">Roof Area (m²)</div>
                     </div>
-                    
+
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <div className="text-2xl font-bold text-green-600">
                         {analysisResult.harvest_potential.annual_harvest_liters.toLocaleString()}
                       </div>
                       <div className="text-sm text-green-800">Annual Harvest (L)</div>
                     </div>
-                    
+
                     <div className="text-center p-4 bg-purple-50 rounded-lg">
                       <div className="text-2xl font-bold text-purple-600">
                         {analysisResult.harvest_potential.daily_average_liters}
                       </div>
                       <div className="text-sm text-purple-800">Daily Average (L)</div>
                     </div>
-                    
+
                     <div className="text-center p-4 bg-orange-50 rounded-lg">
                       <div className="text-2xl font-bold text-orange-600">
                         {analysisResult.rainfall_data.annual.toFixed(0)}
@@ -686,7 +657,7 @@ const SatelliteAnalysis: React.FC = () => {
                       <div className="space-y-2">
                         <h4 className="font-semibold text-sm">Red Marking Detection</h4>
                         <div className="border rounded-lg overflow-hidden">
-                          <img 
+                          <img
                             src={`${API_BASE_URL}/api/cv2-image/${analysisResult.cv2_images.red_mask_path}`}
                             alt="Red marking detection"
                             className="w-full h-auto"
@@ -705,7 +676,7 @@ const SatelliteAnalysis: React.FC = () => {
                       <div className="space-y-2">
                         <h4 className="font-semibold text-sm">Roof Contour Analysis</h4>
                         <div className="border rounded-lg overflow-hidden">
-                          <img 
+                          <img
                             src={`${API_BASE_URL}/api/cv2-image/${analysisResult.cv2_images.contour_analysis_path}`}
                             alt="Roof contour analysis"
                             className="w-full h-auto"
@@ -734,28 +705,28 @@ const SatelliteAnalysis: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Button 
-                      onClick={downloadPdfReport}
-                      disabled={loading}
+                    <Button
+                      onClick={() => downloadSatelliteReport('pdf')}
+                      disabled={busyFormat !== null}
                       className="flex items-center gap-2"
                     >
                       <Download className="w-4 h-4" />
                       Download PDF
                     </Button>
-                    
-                    <Button 
-                      onClick={downloadTextReport}
-                      disabled={loading}
+
+                    <Button
+                      onClick={() => downloadSatelliteReport('txt')}
+                      disabled={busyFormat !== null}
                       variant="outline"
                       className="flex items-center gap-2"
                     >
                       <Download className="w-4 h-4" />
                       Download TXT
                     </Button>
-                    
-                    <Button 
-                      onClick={downloadBothReports}
-                      disabled={loading}
+
+                    <Button
+                      onClick={() => downloadSatelliteReport('zip')}
+                      disabled={busyFormat !== null}
                       variant="secondary"
                       className="flex items-center gap-2"
                     >
@@ -763,8 +734,8 @@ const SatelliteAnalysis: React.FC = () => {
                       Download Both (ZIP)
                     </Button>
                   </div>
-                  
-                  {loading && (
+
+                  {busyFormat && (
                     <div className="mt-4 text-center">
                       <div className="text-sm text-muted-foreground">Generating reports...</div>
                     </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,50 +9,65 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { MapPin, Droplets, Loader2 } from "lucide-react";
-import { Icon3D } from "@/components/Icon3D";
+import { DrawnIcon } from "@/components/DrawnIcon";
 import { useToast } from "@/hooks/use-toast";
-import { api, SiteDetailsInput, ROOF_MATERIALS, ROOF_CONDITIONS, SOIL_TYPES } from "@/lib/api";
+import { api, SiteDetailsInput, AssessmentResult, ROOF_MATERIALS, ROOF_CONDITIONS, SOIL_TYPES } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
+import { useSettings } from "@/context/SettingsContext";
+import { buildAssessmentEntry, saveAssessment } from "@/lib/historyService";
+import type { TranslationKey } from "@/lib/i18n";
 
-const assessmentSchema = z.object({
-  site_name: z.string().min(2, "Site name must be at least 2 characters"),
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
-  roof_area: z.number().min(1, "Roof area must be positive"),
-  roof_material: z.enum(ROOF_MATERIALS),
-  roof_condition: z.enum(ROOF_CONDITIONS),
-  soil_type: z.enum(SOIL_TYPES),
-  annual_rainfall: z.number().min(0, "Rainfall cannot be negative"),
-  water_demand: z.number().min(1, "Water demand must be positive"),
-});
+type Translate = (key: TranslationKey) => string;
 
-type AssessmentFormData = z.infer<typeof assessmentSchema>;
+const buildSchema = (t: Translate) =>
+  z.object({
+    site_name: z.string().trim().min(2, t("val.siteName")),
+    latitude: z.number().min(-90, t("val.latitude")).max(90, t("val.latitude")),
+    longitude: z.number().min(-180, t("val.longitude")).max(180, t("val.longitude")),
+    roof_area: z.number().min(1, t("val.roofArea")),
+    roof_material: z.enum(ROOF_MATERIALS),
+    roof_condition: z.enum(ROOF_CONDITIONS),
+    soil_type: z.enum(SOIL_TYPES),
+    annual_rainfall: z.number().min(0, t("val.rainfall")),
+    water_demand: z.number().min(1, t("val.demand")),
+  });
+
+export type AssessmentFormData = z.infer<ReturnType<typeof buildSchema>>;
 
 interface AssessmentFormProps {
-  onSuccess?: (result: any) => void;
+  onSuccess?: (result: AssessmentResult, input: SiteDetailsInput, savedToAccount: boolean) => void;
+  /** Values to start from, e.g. a saved satellite analysis. */
+  initialValues?: Partial<AssessmentFormData>;
 }
 
-export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
+export const AssessmentForm = ({ onSuccess, initialValues }: AssessmentFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { t } = useLanguage();
+  const { user } = useAuth();
+  const { preferences } = useSettings();
+  const schema = useMemo(() => buildSchema(t), [t]);
 
   const form = useForm<AssessmentFormData>({
-    resolver: zodResolver(assessmentSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       site_name: "",
       latitude: 0,
       longitude: 0,
       roof_area: 0,
-      roof_material: "concrete",
+      roof_material: preferences.defaultRoofMaterial,
       roof_condition: "good",
-      soil_type: "loamy",
+      soil_type: preferences.defaultSoilType,
       annual_rainfall: 0,
       water_demand: 0,
+      ...initialValues,
     },
   });
 
   const onSubmit = async (data: AssessmentFormData) => {
     setIsLoading(true);
-    
+
     try {
       const siteData: SiteDetailsInput = {
         site_name: data.site_name,
@@ -64,22 +79,29 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
         soil_type: data.soil_type,
         annual_rainfall: data.annual_rainfall,
         water_demand: data.water_demand,
+        water_tariff: preferences.waterTariff,
+        first_flush_mm: preferences.firstFlushMm,
       };
-      
+
       const result = await api.createAssessment(siteData);
-      
+
+      // Signed-in users keep every assessment in their account automatically
+      const saved = user ? saveAssessment(buildAssessmentEntry(user.id, siteData, result)) : false;
+
       toast({
-        title: "Assessment Complete!",
-        description: "Your rainwater harvesting assessment has been generated successfully.",
+        title: t("toast.assessmentComplete"),
+        description: saved
+          ? `${t("toast.assessmentCompleteDesc")} ${t("toast.assessmentSaved")}`
+          : t("toast.assessmentCompleteDesc"),
       });
 
-      onSuccess?.(result);
+      onSuccess?.(result, siteData, saved);
       form.reset();
     } catch (error) {
       console.error('Assessment failed:', error);
       toast({
-        title: "Assessment Failed",
-        description: "There was an error processing your assessment. Please try again.",
+        title: t("toast.assessmentFailed"),
+        description: t("toast.assessmentFailedDesc"),
         variant: "destructive",
       });
     } finally {
@@ -94,22 +116,22 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
           form.setValue("latitude", position.coords.latitude);
           form.setValue("longitude", position.coords.longitude);
           toast({
-            title: "Location Updated",
-            description: "Your current location has been set.",
+            title: t("toast.locationUpdated"),
+            description: t("toast.locationUpdatedDesc"),
           });
         },
-        (error) => {
+        () => {
           toast({
-            title: "Location Error",
-            description: "Could not get your location. Please enter manually.",
+            title: t("toast.locationError"),
+            description: t("toast.locationErrorDesc"),
             variant: "destructive",
           });
         }
       );
     } else {
       toast({
-        title: "Location Not Supported",
-        description: "Geolocation is not supported by your browser.",
+        title: t("toast.locationError"),
+        description: t("toast.locationUnsupported"),
         variant: "destructive",
       });
     }
@@ -120,22 +142,22 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
       <Card className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Icon3D name="drop" className="h-7 w-7" />
-            <span>Rainwater Harvesting Assessment</span>
+            <DrawnIcon name="droplets" className="h-6 w-6 text-primary" />
+            <span>{t("form.title")}</span>
           </CardTitle>
           <CardDescription>
-            Fill in the details below to get a comprehensive feasibility analysis for your site
+            {t("form.description")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              
+
               {/* Site Information */}
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 text-lg font-semibold">
-                  <Icon3D name="house" className="h-6 w-6" />
-                  <span>Site Information</span>
+                  <DrawnIcon name="house" className="h-5 w-5 text-accent" />
+                  <span>{t("form.siteInfo")}</span>
                 </div>
 
                 <FormField
@@ -143,9 +165,9 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                   name="site_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Site Name</FormLabel>
+                      <FormLabel>{t("form.siteName")}</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Residential Building, Office Complex" {...field} />
+                        <Input placeholder={t("form.siteNamePlaceholder")} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -158,12 +180,12 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                     name="latitude"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Latitude</FormLabel>
+                        <FormLabel>{t("form.latitude")}</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="number" 
+                          <Input
+                            type="number"
                             step="any"
-                            placeholder="12.9716" 
+                            placeholder="12.9716"
                             {...field}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                           />
@@ -178,12 +200,12 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                     name="longitude"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Longitude</FormLabel>
+                        <FormLabel>{t("form.longitude")}</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="number" 
+                          <Input
+                            type="number"
                             step="any"
-                            placeholder="77.5946" 
+                            placeholder="77.5946"
                             {...field}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                           />
@@ -194,23 +216,23 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                   />
                 </div>
 
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   size="sm"
                   onClick={getCurrentLocation}
                   className="w-fit"
                 >
-                  <MapPin className="h-4 w-4 mr-2" />
-                  Use Current Location
+                  <MapPin className="h-4 w-4 me-2" />
+                  {t("form.useLocation")}
                 </Button>
               </div>
 
               {/* Roof Details */}
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 text-lg font-semibold">
-                  <Icon3D name="roof" className="h-6 w-6" />
-                  <span>Roof Details</span>
+                  <DrawnIcon name="cottage" className="h-5 w-5 text-accent" />
+                  <span>{t("form.roofDetails")}</span>
                 </div>
 
                 <FormField
@@ -218,17 +240,17 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                   name="roof_area"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Roof Area (m²)</FormLabel>
+                      <FormLabel>{t("form.roofArea")}</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="150" 
+                        <Input
+                          type="number"
+                          placeholder="150"
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                         />
                       </FormControl>
                       <FormDescription>
-                        Total catchment area of the roof in square meters
+                        {t("form.roofAreaHelp")}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -241,19 +263,19 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                     name="roof_material"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Roof Material</FormLabel>
+                        <FormLabel>{t("form.roofMaterial")}</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select roof material" />
+                              <SelectValue placeholder={t("form.selectMaterial")} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="concrete">Concrete</SelectItem>
-                            <SelectItem value="tile">Tile</SelectItem>
-                            <SelectItem value="metal">Metal Sheet</SelectItem>
-                            <SelectItem value="asbestos">Asbestos</SelectItem>
-                            <SelectItem value="thatched">Thatched</SelectItem>
+                            <SelectItem value="concrete">{t("material.concrete")}</SelectItem>
+                            <SelectItem value="tile">{t("material.tile")}</SelectItem>
+                            <SelectItem value="metal">{t("material.metal")}</SelectItem>
+                            <SelectItem value="asbestos">{t("material.asbestos")}</SelectItem>
+                            <SelectItem value="thatched">{t("material.thatched")}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -266,17 +288,17 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                     name="roof_condition"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Roof Condition</FormLabel>
+                        <FormLabel>{t("form.roofCondition")}</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select condition" />
+                              <SelectValue placeholder={t("form.selectCondition")} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="good">Good</SelectItem>
-                            <SelectItem value="fair">Fair</SelectItem>
-                            <SelectItem value="poor">Poor</SelectItem>
+                            <SelectItem value="good">{t("condition.good")}</SelectItem>
+                            <SelectItem value="fair">{t("condition.fair")}</SelectItem>
+                            <SelectItem value="poor">{t("condition.poor")}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -289,8 +311,8 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
               {/* Site Conditions */}
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 text-lg font-semibold">
-                  <Icon3D name="gauge" className="h-6 w-6" />
-                  <span>Site Conditions</span>
+                  <DrawnIcon name="gauge" className="h-5 w-5 text-accent" />
+                  <span>{t("form.siteConditions")}</span>
                 </div>
 
                 <FormField
@@ -298,22 +320,22 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                   name="soil_type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Soil Type</FormLabel>
+                      <FormLabel>{t("form.soilType")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select soil type" />
+                            <SelectValue placeholder={t("form.selectSoil")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="sandy">Sandy</SelectItem>
-                          <SelectItem value="loamy">Loamy</SelectItem>
-                          <SelectItem value="clay">Clay</SelectItem>
-                          <SelectItem value="rocky">Rocky</SelectItem>
+                          <SelectItem value="sandy">{t("soil.sandy")}</SelectItem>
+                          <SelectItem value="loamy">{t("soil.loamy")}</SelectItem>
+                          <SelectItem value="clay">{t("soil.clay")}</SelectItem>
+                          <SelectItem value="rocky">{t("soil.rocky")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormDescription>
-                        Soil type affects groundwater recharge feasibility
+                        {t("form.soilHelp")}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -325,17 +347,17 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                   name="annual_rainfall"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Annual Rainfall (mm)</FormLabel>
+                      <FormLabel>{t("form.rainfall")}</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="1200" 
+                        <Input
+                          type="number"
+                          placeholder="1200"
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                         />
                       </FormControl>
                       <FormDescription>
-                        Average annual rainfall in millimeters for your area
+                        {t("form.rainfallHelp")}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -347,17 +369,17 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                   name="water_demand"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Daily Water Demand (L/day)</FormLabel>
+                      <FormLabel>{t("form.demand")}</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="500" 
+                        <Input
+                          type="number"
+                          placeholder="500"
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                         />
                       </FormControl>
                       <FormDescription>
-                        Average daily water consumption in liters
+                        {t("form.demandHelp")}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -365,23 +387,27 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                 />
               </div>
 
+              <p className="text-xs text-muted-foreground">
+                {t("form.tariffNote", { tariff: preferences.waterTariff })}
+              </p>
+
               {/* Submit Button */}
-              <Button 
-                type="submit" 
-                size="lg" 
-                variant="ocean" 
-                className="w-full" 
+              <Button
+                type="submit"
+                size="lg"
+                variant="ocean"
+                className="w-full"
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating Assessment...
+                    <Loader2 className="h-4 w-4 me-2 animate-spin" />
+                    {t("form.submitting")}
                   </>
                 ) : (
                   <>
-                    <Droplets className="h-4 w-4 mr-2" />
-                    Generate Assessment
+                    <Droplets className="h-4 w-4 me-2" />
+                    {t("form.submit")}
                   </>
                 )}
               </Button>

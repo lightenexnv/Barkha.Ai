@@ -231,8 +231,22 @@
   }
 
   .nature-button {
-    @apply bg-gradient-to-r from-accent to-accent-light text-accent-foreground 
-           hover:shadow-lg hover:scale-105 active:scale-95 
+    @apply bg-gradient-to-r from-accent to-accent-light text-accent-foreground
+           hover:shadow-lg hover:scale-105 active:scale-95
            transition-all duration-300 rounded-lg;
   }
+}
+
+/* Settings > "3D icon animations" off: stop decorative looping motion.
+   Loading spinners (animate-spin) keep running. */
+.no-3d-motion .animate-float,
+.no-3d-motion .animate-ping,
+.no-3d-motion .animate-wave,
+.no-3d-motion .animate-shimmer,
+.no-3d-motion .animate-ripple {
+  animation: none !important;
+}
+
+.no-3d-motion .animate-ping {
+  display: none;
 }

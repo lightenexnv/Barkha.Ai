@@ -23,6 +23,8 @@ app.add_middleware(
     allow_credentials="*" not in CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Lets the cross-origin frontend read the report filename
+    expose_headers=["Content-Disposition"],
 )
 
 app.include_router(api_router, prefix="/api")

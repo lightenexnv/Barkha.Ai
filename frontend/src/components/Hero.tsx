@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Satellite } from "lucide-react";
 import { Icon3D, type Icon3DName } from "@/components/Icon3D";
+import { DrawnIcon } from "@/components/DrawnIcon";
 import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-rainwater.png";
 import { computeHeroLayout, paintBackdrop } from "@/components/hero/heroLayout";
@@ -198,7 +199,7 @@ export const Hero = () => {
               style={{ top: layout.badgeTop, left: layout.isDesktop ? layout.gutter : undefined }}
             >
               <div className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm font-medium text-primary shadow-soft backdrop-blur-md">
-                <Icon3D name="drop" className="h-5 w-5 animate-float" />
+                <DrawnIcon name="droplets" className="h-4 w-4 animate-float" />
                 <span>Professional Water Assessment Platform</span>
               </div>
             </div>

@@ -150,8 +150,9 @@ async def generate_assessment_pdf(assessment: Assessment) -> str:
             
             harvestable = safe_float(assessment_data.get('harvestable_volume', 0))
             recommendation = safe_str(recommendations.get('recommended_option', 'Unknown')).replace('_', ' ').title()
-            storage_req = assessment_data.get('storage_recommendation', {}) or {}
-            recharge_req = assessment_data.get('recharge_recommendation', {}) or {}
+            # Records saved before the key names were unified use the older names
+            storage_req = assessment_data.get('storage_recommendation') or assessment_data.get('storage_requirement') or {}
+            recharge_req = assessment_data.get('recharge_recommendation') or assessment_data.get('recharge_requirement') or {}
             recharge_pit = recharge_req.get('recharge_pit', {}) or {}
             recharge_trench = recharge_req.get('recharge_trench', {}) or {}
             
@@ -190,18 +191,18 @@ async def generate_assessment_pdf(assessment: Assessment) -> str:
         # Cost Analysis - with safe data handling
         try:
             story.append(Paragraph("Cost Analysis", subtitle_style))
-            costs = recommendations.get('cost_analysis', {}) or {}
+            costs = recommendations.get('cost_analysis') or recommendations.get('costs') or {}
             
             cost_data = [
                 ['Component', 'Cost (INR)'],
-                ['Storage System', f"₹{safe_float(costs.get('storage_tank_cost')):,.2f}"],
-                ['Recharge Structure', f"₹{safe_float(costs.get('recharge_structure_cost')):,.2f}"],
-                ['Piping & Fittings', f"₹{safe_float(costs.get('piping_cost')):,.2f}"],
-                ['Filtration System', f"₹{safe_float(costs.get('filtration_cost')):,.2f}"],
-                ['Labor Cost', f"₹{safe_float(costs.get('labor_cost')):,.2f}"],
-                ['Material Contingency', f"₹{safe_float(costs.get('material_contingency')):,.2f}"],
-                ['Tax (GST)', f"₹{safe_float(costs.get('tax')):,.2f}"],
-                ['Total Cost', f"₹{safe_float(costs.get('total_cost')):,.2f}"]
+                ['Storage System', f"Rs. {safe_float(costs.get('storage_tank_cost')):,.2f}"],
+                ['Recharge Structure', f"Rs. {safe_float(costs.get('recharge_structure_cost')):,.2f}"],
+                ['Piping & Fittings', f"Rs. {safe_float(costs.get('piping_cost')):,.2f}"],
+                ['Filtration System', f"Rs. {safe_float(costs.get('filtration_cost')):,.2f}"],
+                ['Labor Cost', f"Rs. {safe_float(costs.get('labor_cost')):,.2f}"],
+                ['Material Contingency', f"Rs. {safe_float(costs.get('material_contingency')):,.2f}"],
+                ['Tax (GST)', f"Rs. {safe_float(costs.get('tax')):,.2f}"],
+                ['Total Cost', f"Rs. {safe_float(costs.get('total_cost')):,.2f}"]
             ]
             
             cost_table = Table(cost_data, colWidths=[8*cm, 8*cm])
@@ -229,15 +230,15 @@ async def generate_assessment_pdf(assessment: Assessment) -> str:
         # Savings Analysis - with safe data handling
         try:
             story.append(Paragraph("Savings Analysis", subtitle_style))
-            savings = recommendations.get('savings_analysis', {}) or {}
+            savings = recommendations.get('savings_analysis') or recommendations.get('savings') or {}
             payback_period = safe_str(recommendations.get('payback_period'))
             
             savings_data = [
                 ['Parameter', 'Value'],
                 ['Annual Water Saved', f"{safe_float(savings.get('annual_water_saved')):.2f} m³"],
-                ['Annual Cost Savings', f"₹{safe_float(savings.get('annual_cost_savings')):,.2f}"],
-                ['Monthly Savings', f"₹{safe_float(savings.get('monthly_savings')):,.2f}"],
-                ['Water Tariff Used', f"₹{safe_float(savings.get('water_tariff_used')):.2f}/m³"],
+                ['Annual Cost Savings', f"Rs. {safe_float(savings.get('annual_cost_savings')):,.2f}"],
+                ['Monthly Savings', f"Rs. {safe_float(savings.get('monthly_savings')):,.2f}"],
+                ['Water Tariff Used', f"Rs. {safe_float(savings.get('water_tariff_used')):.2f}/m³"],
                 ['Payback Period', payback_period]
             ]
             
@@ -279,14 +280,14 @@ async def generate_assessment_pdf(assessment: Assessment) -> str:
                             boq_data.append([
                                 safe_str(item.get('item')),
                                 safe_str(item.get('quantity')),
-                                f"₹{safe_float(item.get('rate')):,.2f}",
-                                f"₹{safe_float(item.get('amount')):,.2f}"
+                                f"Rs. {safe_float(item.get('rate')):,.2f}",
+                                f"Rs. {safe_float(item.get('amount')):,.2f}"
                             ])
                         except Exception as item_error:
                             logger.warning(f"Error processing BOQ item: {item_error}")
                             continue
                 
-                boq_data.append(['Total', '', '', f"₹{safe_float(boq.get('total_cost')):,.2f}"])
+                boq_data.append(['Total', '', '', f"Rs. {safe_float(boq.get('total_cost')):,.2f}"])
                 
                 boq_table = Table(boq_data, colWidths=[6*cm, 3*cm, 3*cm, 4*cm])
                 boq_table.setStyle(TableStyle([

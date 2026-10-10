@@ -17,6 +17,10 @@ export interface SiteDetailsInput {
   soil_type: string;
   annual_rainfall: number;
   water_demand: number;
+  /** ₹ per m³ used for savings; the backend defaults to 50 */
+  water_tariff?: number;
+  /** First-flush diversion per rain event (mm); the backend defaults to 1.5 */
+  first_flush_mm?: number;
 }
 
 export interface AssessmentResult {
@@ -69,6 +73,7 @@ export interface AssessmentResult {
     total_cost: number;
   };
   payback_period: string | null; // Added to match backend
+  additional_info?: Record<string, unknown> | null;
 }
 
 export interface Assessment {
@@ -139,28 +144,6 @@ class BarkhaAPI {
   // Get specific assessment
   async getAssessment(assessmentId: string): Promise<Assessment> {
     return this.request<Assessment>(`/api/assessments/${assessmentId}`);
-  }
-
-  // Generate PDF report
-  async generateReport(assessmentId: string): Promise<Blob> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/generate-report/${assessmentId}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/pdf',
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to generate report: ${response.status} - ${errorText}`);
-      }
-
-      return await response.blob();
-    } catch (error) {
-      console.error('Generate report failed:', error);
-      throw error;
-    }
   }
 
   // Upload site photos
@@ -263,89 +246,114 @@ class BarkhaAPI {
 
   // Test PDF download functionality
   async testPdfDownload(): Promise<Blob> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/test-pdf-download`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/pdf',
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to download test PDF: ${response.status} - ${errorText}`);
-      }
-
-      return await response.blob();
-    } catch (error) {
-      console.error('Test PDF download failed:', error);
-      throw error;
-    }
+    return (await this.fetchFile(`${API_BASE_URL}/api/test-pdf-download`, { method: 'GET' }, 'test_download.pdf')).blob;
   }
 
-  async downloadPdfReport(assessmentId: string): Promise<Blob> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/generate-report/${assessmentId}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/pdf',
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to download PDF report: ${response.status} - ${errorText}`);
-      }
-
-      return await response.blob();
-    } catch (error) {
-      console.error('PDF report download failed:', error);
-      throw error;
-    }
+  /** Download a report the server generates from its stored copy of the assessment. */
+  async downloadReport(assessmentId: string, format: ReportFormat): Promise<DownloadedFile> {
+    const path = REPORT_PATHS[format];
+    return this.fetchFile(
+      `${API_BASE_URL}/api/${path}/${encodeURIComponent(assessmentId)}`,
+      { method: 'GET', headers: { Accept: REPORT_MIME_TYPES[format] } },
+      defaultReportName(assessmentId, format),
+    );
   }
 
-  async downloadTextReport(assessmentId: string): Promise<Blob> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/generate-text-report/${assessmentId}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'text/plain',
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to download text report: ${response.status} - ${errorText}`);
-      }
-
-      return await response.blob();
-    } catch (error) {
-      console.error('Text report download failed:', error);
-      throw error;
-    }
+  /** Have the server build a report from data the client already holds. */
+  async downloadReportDirect(
+    site: Partial<SiteDetailsInput>,
+    result: Partial<AssessmentResult>,
+    format: ReportFormat,
+  ): Promise<DownloadedFile> {
+    return this.fetchFile(
+      `${API_BASE_URL}/api/generate-report-direct`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: REPORT_MIME_TYPES[format] },
+        body: JSON.stringify({ site, result, format }),
+      },
+      defaultReportName(result.assessment_id || 'report', format),
+    );
   }
 
-  async downloadBothReports(assessmentId: string): Promise<Blob> {
+  private async fetchFile(url: string, init: RequestInit, fallbackName: string): Promise<DownloadedFile> {
+    let response: Response;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/download-reports/${assessmentId}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/zip',
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to download reports: ${response.status} - ${errorText}`);
-      }
-
-      return await response.blob();
+      response = await fetch(url, init);
     } catch (error) {
-      console.error('Reports download failed:', error);
-      throw error;
+      // fetch only rejects when the server could not be reached at all
+      throw new ApiError(0, error instanceof Error ? error.message : 'Network error');
     }
+    if (!response.ok) {
+      throw new ApiError(response.status, await errorDetail(response));
+    }
+    const contentType = response.headers.get('Content-Type') || 'application/octet-stream';
+    const blob = await response.blob();
+    return {
+      // Re-wrap so the Blob carries the right MIME type even if the server omitted it
+      blob: blob.type ? blob : new Blob([blob], { type: contentType }),
+      filename: filenameFromDisposition(response.headers.get('Content-Disposition')) || fallbackName,
+    };
   }
 }
+
+export type ReportFormat = 'pdf' | 'txt' | 'zip';
+
+export interface DownloadedFile {
+  blob: Blob;
+  filename: string;
+}
+
+/** HTTP failure with the server's `detail` message; status 0 means unreachable. */
+export class ApiError extends Error {
+  constructor(public status: number, public detail: string) {
+    super(detail);
+    this.name = 'ApiError';
+  }
+}
+
+const REPORT_PATHS: Record<ReportFormat, string> = {
+  pdf: 'generate-report',
+  txt: 'generate-text-report',
+  zip: 'download-reports',
+};
+
+export const REPORT_MIME_TYPES: Record<ReportFormat, string> = {
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  zip: 'application/zip',
+};
+
+export const defaultReportName = (assessmentId: string, format: ReportFormat) =>
+  `${format === 'zip' ? 'RTRWH_Reports' : 'RTRWH_Assessment'}_${assessmentId.slice(0, 8)}.${format}`;
+
+/** Read FastAPI's {"detail": ...} body, falling back to the raw text. */
+const errorDetail = async (response: Response): Promise<string> => {
+  let text = '';
+  try {
+    text = await response.text();
+    const json = JSON.parse(text);
+    if (typeof json?.detail === 'string') return json.detail;
+    if (json?.detail) return JSON.stringify(json.detail);
+  } catch {
+    // Not JSON; use the text as is
+  }
+  return text || `HTTP ${response.status}`;
+};
+
+export const filenameFromDisposition = (header: string | null): string | null => {
+  if (!header) return null;
+  const encoded = header.match(/filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i);
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded[1].trim().replace(/^"|"$/g, ''));
+    } catch {
+      // Malformed encoding; try the plain filename parameter instead
+    }
+  }
+  const plain = header.match(/filename\s*=\s*"?([^";]+)"?/i);
+  return plain ? plain[1].trim() : null;
+};
 
 export const api = new BarkhaAPI();
 
