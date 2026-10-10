@@ -425,17 +425,29 @@ export const SaralAssistant = () => {
               <DialogTitle className="text-lg font-bold">Barkha Saral</DialogTitle>
               <DialogDescription className="text-xs">बोलकर या छूकर जवाब दें · Speak or tap to answer</DialogDescription>
             </div>
-            {stepIndex >= 0 && (
-              <div className="flex gap-1.5" aria-hidden="true">
-                {STEPS_WITH_DOTS.map((s, i) => (
-                  <motion.span
-                    key={s}
-                    animate={{ width: i === stepIndex ? 22 : 8, backgroundColor: i <= stepIndex ? "hsl(var(--primary))" : "hsl(var(--muted))" }}
-                    className="h-2 rounded-full"
-                  />
-                ))}
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              {stepIndex >= 0 && (
+                <div className="flex gap-1.5" aria-hidden="true">
+                  {STEPS_WITH_DOTS.map((s, i) => (
+                    <motion.span
+                      key={s}
+                      animate={{ width: i === stepIndex ? 22 : 8, backgroundColor: i <= stepIndex ? "hsl(var(--primary))" : "hsl(var(--muted))" }}
+                      className="h-2 rounded-full"
+                    />
+                  ))}
+                </div>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => close(false)}
+                aria-label="Exit voice assistant"
+                className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
 
           <AnimatePresence mode="wait">

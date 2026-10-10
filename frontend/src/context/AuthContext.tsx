@@ -67,7 +67,19 @@ const rememberProfile = (user: User): User => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(() => readJson<User | null>(SESSION_KEY, null));
+  const [user, setUser] = useState<User | null>(() => {
+    const existing = readJson<User | null>(SESSION_KEY, null);
+    if (existing && (existing.name === "Aditya Sharma" || existing.email === "aditya.sharma@gmail.com")) {
+      const updated = {
+        ...existing,
+        name: "Neil Verma",
+        email: "neil.verma@gmail.com",
+      };
+      writeJson(SESSION_KEY, updated);
+      return updated;
+    }
+    return existing;
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
@@ -91,10 +103,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       await wait(MOCK_LATENCY_MS);
-      const email = "aditya.sharma@gmail.com";
+      const email = "neil.verma@gmail.com";
       return startSession({
         id: userIdFor(email),
-        name: "Aditya Sharma",
+        name: "Neil Verma",
         email,
         role: "homeowner",
         provider: "google",

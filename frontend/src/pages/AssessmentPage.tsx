@@ -9,7 +9,8 @@ import { api, AssessmentResult as AssessmentResultType, SiteDetailsInput } from 
 import { readPlanLink } from "@/lib/share";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { getAssessment } from "@/lib/historyService";
+import { getAssessment, getLastCompletedAssessment } from "@/lib/historyService";
+import { downloadReport } from "@/lib/reports";
 import { useToast } from "@/hooks/use-toast";
 
 interface SavedView {
@@ -31,7 +32,7 @@ const AssessmentPage = () => {
   // from a saved analysis; ?plan=<data> rebuilds a shared plan
   const viewId = searchParams.get("view");
   const prefillId = searchParams.get("prefill");
-  const sharedPlan = searchParams.get("plan");
+  const sharedPlan = searchParams.get("p") || searchParams.get("plan");
   const location = useLocation();
   const [loadingShared, setLoadingShared] = useState(false);
 
@@ -57,7 +58,17 @@ const AssessmentPage = () => {
     setLoadingShared(true);
     api
       .createAssessment(input)
-      .then((result) => !cancelled && setSaved({ result, input }))
+      .then((result) => {
+        if (!cancelled) {
+          setSaved({ result, input });
+          if (input.shared_by) {
+            toast({
+              title: `Shared by ${input.shared_by}`,
+              description: `Viewing rainwater harvesting assessment for ${input.site_name}.`,
+            });
+          }
+        }
+      })
       .catch(() => !cancelled && toast({ title: t("toast.assessmentFailed"), description: t("toast.assessmentFailedDesc"), variant: "destructive" }))
       .finally(() => !cancelled && setLoadingShared(false));
     return () => {
@@ -70,12 +81,12 @@ const AssessmentPage = () => {
 
   useEffect(() => {
     const id = viewId || prefillId;
-    if (!id || !user) return;
-    const linkKey = `${user.id}|${viewId}|${prefillId}`;
+    if (!id) return;
+    const linkKey = `${user?.id ?? "guest"}|${viewId}|${prefillId}`;
     if (handledLink.current === linkKey) return;
     handledLink.current = linkKey;
 
-    const entry = getAssessment(user.id, id);
+    const entry = (user ? getAssessment(user.id, id) : null) ?? (getLastCompletedAssessment()?.id === id ? getLastCompletedAssessment() : null);
     if (!entry) {
       toast({ title: t("page.notFoundInHistory"), variant: "destructive" });
       setSearchParams({}, { replace: true });
@@ -83,6 +94,9 @@ const AssessmentPage = () => {
     }
     if (viewId && entry.result) {
       setSaved({ result: entry.result, input: entry.site as SiteDetailsInput });
+      if (searchParams.get("download") === "pdf") {
+        downloadReport({ site: entry.site as SiteDetailsInput, result: entry.result }, "pdf");
+      }
     } else {
       setSaved(null);
       const { latitude, longitude } = entry.site;
@@ -93,7 +107,7 @@ const AssessmentPage = () => {
       });
       setWizardKey((key) => key + 1);
     }
-  }, [viewId, prefillId, user, t, toast, setSearchParams]);
+  }, [viewId, prefillId, user, t, toast, searchParams, setSearchParams]);
 
   const startNew = () => {
     setSaved(null);

@@ -14,7 +14,7 @@ import { api, wakeBackend, type AssessmentResult as AssessmentResultType, type S
 import { useSlowFlag } from "@/hooks/useSlowFlag";
 import { isValidCoordinate } from "@/lib/climate";
 import { centroid, distanceM, type LatLon } from "@/lib/geo";
-import { buildAssessmentEntry, deleteAssessment, saveAssessment } from "@/lib/historyService";
+import { buildAssessmentEntry, deleteAssessment, saveAssessment, saveLastCompletedAssessment } from "@/lib/historyService";
 import { ROOF_CONDITION_OPTIONS, ROOF_MATERIAL_OPTIONS, SOIL_TYPE_OPTIONS } from "@/lib/siteOptions";
 import { cn } from "@/lib/utils";
 import { DetailsStep } from "./DetailsStep";
@@ -153,6 +153,9 @@ export const AssessmentWizard = ({ seed }: { seed?: WizardSeed }) => {
         lastSignature.current = signature;
         setResult({ result: next, input });
         setComputation({ status: "idle" });
+
+        // Save to latest completed assessment shortcut for hero page
+        saveLastCompletedAssessment(buildAssessmentEntry(user?.id ?? "guest", input, next));
 
         // Signed-in users keep the latest version of this assessment in their history
         if (user) {

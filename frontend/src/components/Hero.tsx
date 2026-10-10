@@ -10,6 +10,7 @@ import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-rainwater.png";
 import { computeHeroLayout, paintBackdrop } from "@/components/hero/heroLayout";
 import "@/components/hero/WaterRefraction.css";
+import { LastAssessmentCard } from "@/components/hero/LastAssessmentCard";
 
 const WaterHeroScene = lazy(() => import("@/components/hero/WaterHeroScene"));
 
@@ -132,7 +133,9 @@ export const Hero = () => {
   const handleSceneReady = useCallback(() => setSceneReady(true), []);
 
   const sectionStyle = {
-    minHeight: layout?.isDesktop ? layout.minHeight : "100svh",
+    minHeight: layout?.isDesktop
+      ? Math.max(layout.minHeight, layout.island.y + layout.island.width * 0.36 + 260)
+      : "100svh",
     "--waterline": `${layout?.waterline ?? 0}px`,
   } as CSSProperties;
 
@@ -193,6 +196,32 @@ export const Hero = () => {
         <h1 id="hero-title" className="sr-only">
           Intelligent Rainwater Harvesting Assessment
         </h1>
+
+        {/* Translucent assessment shortcut card submerged in water directly under the 3D model */}
+        {layout && (
+          <div
+            className={
+              layout.isDesktop
+                ? "pointer-events-none absolute z-20"
+                : "pointer-events-none relative z-20 mx-auto w-full max-w-[560px] px-4 pt-4"
+            }
+            style={
+              layout.isDesktop
+                ? {
+                    left: Math.max(300, Math.min((box.width || 1280) - 300, layout.island.x)),
+                    top: layout.island.y + layout.island.width * 0.36,
+                    transform: "translateX(-50%)",
+                    width: "min(560px, calc(100% - 32px))",
+                    maxWidth: "560px",
+                  }
+                : undefined
+            }
+          >
+            <div className="pointer-events-auto w-full">
+              <LastAssessmentCard />
+            </div>
+          </div>
+        )}
 
         {layout && (
           <>

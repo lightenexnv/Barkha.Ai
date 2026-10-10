@@ -22,11 +22,30 @@ const supportsWebGL = () => {
 };
 
 /** A year of this site's real rainfall, animated on the 3D model: tank fills, gets used, overflows to recharge. */
-export const RainReplay = ({ input, result }: { input: SiteDetailsInput; result: AssessmentResult }) => {
+export const RainReplay = ({
+  input,
+  result,
+  isImplemented = false,
+  implementedAt,
+}: {
+  input: SiteDetailsInput;
+  result: AssessmentResult;
+  isImplemented?: boolean;
+  implementedAt?: string;
+}) => {
   const { t, locale } = useLanguage();
   const box = useRef<HTMLDivElement>(null);
   const inView = useInView(box, { margin: "-80px" });
   const webgl = useMemo(supportsWebGL, []);
+
+  const startMonth = useMemo(() => {
+    if (!isImplemented || !implementedAt) return 0;
+    try {
+      return new Date(implementedAt).getMonth();
+    } catch {
+      return 0;
+    }
+  }, [isImplemented, implementedAt]);
 
   const usesTank = !["recharge_only", "not_feasible"].includes(result.recommended_option);
   const capacity = usesTank ? result.storage_recommendation.recommended_volume : 0;
@@ -43,8 +62,15 @@ export const RainReplay = ({ input, result }: { input: SiteDetailsInput; result:
 
   const replay = useRef<ReplayState>({ tank: 0, rain: 0, recharge: 0 });
   const [playing, setPlaying] = useState(true);
-  const [clock, setClock] = useState(0); // months elapsed, fractional
+  const [clock, setClock] = useState(() => (isImplemented ? startMonth : 0)); // months elapsed, fractional
   const last = useRef<number | null>(null);
+
+  // Sync clock when implementation status changes
+  useEffect(() => {
+    if (isImplemented) {
+      setClock(startMonth);
+    }
+  }, [isImplemented, startMonth]);
 
   // Advance the clock while playing and visible; drive the 3D scene from it
   useEffect(() => {
@@ -79,8 +105,17 @@ export const RainReplay = ({ input, result }: { input: SiteDetailsInput; result:
   if (!result.hydrology?.monthly_harvest?.length || !month) return null;
 
   const litres = (m3: number) => Math.round(m3 * 1000).toLocaleString(locale);
-  const soFar = (key: "inflowM3" | "overflowM3" | "usedM3") =>
-    year.months.slice(0, monthIndex).reduce((sum, m) => sum + m[key], 0) + month[key] * Math.min(1, progress * 2);
+  const soFar = (key: "inflowM3" | "overflowM3" | "usedM3") => {
+    if (!isImplemented) {
+      return year.months.slice(0, monthIndex).reduce((sum, m) => sum + m[key], 0) + month[key] * Math.min(1, progress * 2);
+    }
+    // Only calculate from the start month of implementation
+    if (monthIndex < startMonth) {
+      return 0; // Pre-implementation month
+    }
+    const fromStart = year.months.slice(startMonth, monthIndex);
+    return fromStart.reduce((sum, m) => sum + m[key], 0) + month[key] * Math.min(1, progress * 2);
+  };
   const monthName = (index: number) => new Date(2025, index, 1).toLocaleDateString(locale, { month: "short" });
   const tankPct = capacity > 0 ? Math.round((level / capacity) * 100) : 0;
 
@@ -96,11 +131,20 @@ export const RainReplay = ({ input, result }: { input: SiteDetailsInput; result:
     >
       <div className="flex items-start justify-between gap-3 p-5 sm:p-6">
         <div>
-          <h2 id="replay-title" className="flex items-center gap-1.5 text-xl font-bold">
+          <h2 id="replay-title" className="flex flex-wrap items-center gap-2 text-xl font-bold">
             {t("replay.title")}
             <InfoTip>{t("replay.tip")}</InfoTip>
+            {isImplemented && (
+              <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                ● Live Since {monthName(startMonth)}
+              </span>
+            )}
           </h2>
-          <p className="text-sm text-muted-foreground">{t("replay.subtitle")}</p>
+          <p className="text-sm text-muted-foreground">
+            {isImplemented
+              ? `Replaying dynamic water collection starting from your implementation date (${monthName(startMonth)}).`
+              : t("replay.subtitle")}
+          </p>
         </div>
       </div>
 
@@ -155,29 +199,40 @@ export const RainReplay = ({ input, result }: { input: SiteDetailsInput; result:
             <Button size="sm" variant="ocean" onClick={() => setPlaying((value) => !value)} aria-label={playing ? t("replay.pause") : t("replay.play")}>
               {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setClock(0)} aria-label={t("replay.restart")}>
+            <Button size="sm" variant="outline" onClick={() => setClock(isImplemented ? startMonth : 0)} aria-label={t("replay.restart")}>
               <RotateCcw className="h-4 w-4" />
             </Button>
           </div>
           <div className="grid grid-cols-6 gap-1" role="group" aria-label={t("replay.months")}>
-            {year.months.map((m, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={() => setClock(index + 0.55)}
-                className={cn(
-                  "relative overflow-hidden rounded-md border py-1 text-[11px] font-medium transition-colors",
-                  index === monthIndex ? "border-primary text-primary" : "border-border/60 text-muted-foreground hover:border-primary/50",
-                )}
-              >
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-x-0 bottom-0 bg-sky-400/25"
-                  style={{ height: `${(m.rainMm / year.maxRainMm) * 100}%` }}
-                />
-                <span className="relative">{monthName(index)}</span>
-              </button>
-            ))}
+            {year.months.map((m, index) => {
+              const isPreImpl = isImplemented && index < startMonth;
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setClock(index + 0.55)}
+                  className={cn(
+                    "relative overflow-hidden rounded-md border py-1 text-[11px] font-medium transition-colors",
+                    index === monthIndex
+                      ? "border-primary text-primary shadow-sm"
+                      : isPreImpl
+                        ? "border-border/40 text-muted-foreground/60 bg-muted/20"
+                        : "border-border/60 text-muted-foreground hover:border-primary/50",
+                  )}
+                  title={isPreImpl ? "Pre-implementation period" : "Active harvesting month"}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute inset-x-0 bottom-0",
+                      isPreImpl ? "bg-muted-foreground/15" : "bg-sky-400/25",
+                    )}
+                    style={{ height: `${(m.rainMm / year.maxRainMm) * 100}%` }}
+                  />
+                  <span className="relative">{monthName(index)}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

@@ -222,6 +222,15 @@
            hover:shadow-lg hover:scale-105 active:scale-95
            transition-all duration-300 rounded-lg;
   }
+
+  /* Hide scrollbar */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 /* Settings > "3D icon animations" off: stop decorative looping motion.

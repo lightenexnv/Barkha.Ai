@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, ChevronDown, CloudRain, LogIn, MapPin, RotateCcw, Ruler, Save, Share2, ShieldAlert } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, CloudRain, Hammer, LogIn, MapPin, RotateCcw, Ruler, Save, Share2, ShieldAlert, Store, Wrench } from "lucide-react";
 import { shareMessage, whatsappUrl } from "@/lib/share";
 import { Button } from "@/components/ui/button";
 import { DrawnIcon } from "@/components/DrawnIcon";
 import { InfoTip } from "@/components/InfoTip";
+import { MaintenanceDrawer } from "@/components/MaintenanceDrawer";
 import { ReportDownloadMenu } from "@/components/ReportDownloadMenu";
 import { placeLine } from "@/components/assessment/model";
 import { Pressable } from "@/components/motion/Motion";
@@ -20,7 +21,7 @@ import { AssessmentResult as AssessmentResultType, SiteDetailsInput, formatCurre
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useUnits } from "@/context/SettingsContext";
-import { buildAssessmentEntry, saveAssessment, useAssessmentHistory } from "@/lib/historyService";
+import { buildAssessmentEntry, getAssessment, getLastCompletedAssessment, isAssessmentImplemented, saveAssessment, saveLastCompletedAssessment, setAssessmentImplemented, useAssessmentHistory } from "@/lib/historyService";
 import type { TranslationKey } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -128,6 +129,43 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
   const history = useAssessmentHistory(user?.id);
   const isSaved = history.some((entry) => entry.id === result.assessment_id);
   const [subsidy, setSubsidy] = useState<SubsidySelection>(() => defaultSelection(result.subsidies));
+  const [implemented, setImplemented] = useState<boolean>(() =>
+    isAssessmentImplemented(result.assessment_id, user?.id),
+  );
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+
+  useEffect(() => {
+    setImplemented(isAssessmentImplemented(result.assessment_id, user?.id));
+  }, [result.assessment_id, user?.id]);
+
+  const implementedAt = useMemo(() => {
+    if (!implemented) return undefined;
+    const fromHistory = user ? getAssessment(user.id, result.assessment_id)?.implementedAt : undefined;
+    const fromLast = getLastCompletedAssessment()?.id === result.assessment_id ? getLastCompletedAssessment()?.implementedAt : undefined;
+    return fromHistory || fromLast || new Date().toISOString();
+  }, [implemented, user, result.assessment_id]);
+
+  // Keep latest completed assessment up-to-date for hero page quick shortcut
+  useEffect(() => {
+    saveLastCompletedAssessment(buildAssessmentEntry(user?.id ?? "guest", input, result));
+  }, [user?.id, input, result]);
+
+  const handleToggleImplemented = () => {
+    const next = !implemented;
+    setImplemented(next);
+    setAssessmentImplemented(result.assessment_id, next, user?.id);
+    if (next) {
+      toast({
+        title: "Confirmed as Implemented! 🎉",
+        description: "Your active system metrics are now displayed submerged under the 3D model on the home page.",
+      });
+    } else {
+      toast({
+        title: "Status Updated",
+        description: "System marked as planned. It will no longer show on the home page shortcut until implemented.",
+      });
+    }
+  };
 
   const handleSave = () => {
     if (!user) return;
@@ -150,26 +188,48 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       {/* Header */}
-      <motion.div initial="hidden" animate="show" variants={fadeUp} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+      <motion.div initial="hidden" animate="show" variants={fadeUp} className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold lg:text-4xl">
             {t("result.title1")} <span className="gradient-text">{t("result.title2")}</span>
           </h1>
           <p className="text-muted-foreground">{t("result.subtitle")}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Pressable>
-            <Button variant="outline" onClick={onNewAssessment}>
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-1 sm:pb-0 flex-nowrap shrink-0">
+          <Pressable className="shrink-0">
+            <Button
+              variant={implemented ? "outline" : "ocean"}
+              className={cn(
+                "whitespace-nowrap",
+                implemented && "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:border-destructive hover:bg-destructive/10 hover:text-destructive",
+              )}
+              onClick={handleToggleImplemented}
+            >
+              {implemented ? (
+                <>
+                  <Check className="me-2 h-4 w-4 text-emerald-500" />
+                  Implemented
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="me-2 h-4 w-4" />
+                  Confirm Implementation
+                </>
+              )}
+            </Button>
+          </Pressable>
+          <Pressable className="shrink-0">
+            <Button variant="outline" className="whitespace-nowrap" onClick={onNewAssessment}>
               <RotateCcw className="me-2 h-4 w-4" />
               {t("result.newAssessment")}
             </Button>
           </Pressable>
-          <ReportDownloadMenu data={{ site: input, result }} />
-          <Pressable>
+          <ReportDownloadMenu className="shrink-0" data={{ site: input, result }} />
+          <Pressable className="shrink-0">
             <Button
               variant="outline"
-              className="border-[#25D366] bg-[#25D366] text-white hover:bg-[#1ebe5a] hover:text-white"
-              onClick={() => window.open(whatsappUrl(shareMessage(input, result)), "_blank", "noopener")}
+              className="shrink-0 whitespace-nowrap border-[#25D366] bg-[#25D366] text-white hover:bg-[#1ebe5a] hover:text-white"
+              onClick={() => window.open(whatsappUrl(shareMessage(input, result, undefined, user?.name)), "_blank", "noopener")}
             >
               <Share2 className="me-2 h-4 w-4" />
               {t("share.whatsapp")}
@@ -177,31 +237,6 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
           </Pressable>
         </div>
       </motion.div>
-
-      {/* Account status */}
-      <div
-        className={cn(
-          "flex flex-col justify-between gap-3 rounded-lg border px-4 py-3 text-sm sm:flex-row sm:items-center",
-          isSaved ? "border-success/30 bg-success/10" : "border-primary/20 bg-primary/5",
-        )}
-      >
-        <div className="flex items-center gap-2">
-          {isSaved ? <CheckCircle2 className="h-4 w-4 shrink-0 text-success" /> : <DrawnIcon name="document" className="h-5 w-5 shrink-0 text-primary" />}
-          <span>{isSaved ? t("result.savedBanner") : user ? t("result.unsavedBanner") : t("result.guestBanner")}</span>
-        </div>
-        {!isSaved &&
-          (user ? (
-            <Button size="sm" variant="ocean" onClick={handleSave}>
-              <Save className="me-2 h-4 w-4" />
-              {t("result.saveToAccount")}
-            </Button>
-          ) : (
-            <Button size="sm" variant="outline" onClick={openAuthModal}>
-              <LogIn className="me-2 h-4 w-4" />
-              {t("auth.signIn")}
-            </Button>
-          ))}
-      </div>
 
       {/* 1. The key numbers */}
       <HighlightCards
@@ -212,6 +247,12 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
         tariff={result.savings_analysis.water_tariff_used}
         paybackYears={paybackYears}
         paybackAfterSubsidy={paybackAfterSubsidy}
+        isImplemented={implemented}
+        implementedAt={implementedAt}
+        site={input}
+        result={result}
+        totalCost={totalCost}
+        subsidyAmount={subsidyOff}
       />
 
       {/* 2. The site these numbers are for */}
@@ -252,7 +293,12 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
       <MonsoonLive input={input} result={result} />
 
       {/* A year of this roof's rain, animated in 3D */}
-      <RainReplay input={input} result={result} />
+      <RainReplay
+        input={input}
+        result={result}
+        isImplemented={implemented}
+        implementedAt={implementedAt}
+      />
 
       {/* 3. What it costs */}
       {result.financial_statement ? (
@@ -275,6 +321,76 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
       {result.dossiers?.length ? (
         <RecommendationSection dossiers={result.dossiers} />
       ) : null}
+
+      {/* Bottom action bar — same controls as the header, repeated for convenience */}
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true }}
+        className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-border/60 bg-card/60 p-5 backdrop-blur-sm"
+      >
+        <ReportDownloadMenu data={{ site: input, result }} />
+        <Pressable>
+          <Button
+            variant="outline"
+            className="border-primary/40 text-primary hover:bg-primary/10"
+            onClick={() => setMaintenanceOpen(true)}
+          >
+            <Store className="me-2 h-4 w-4 text-primary" />
+            Suppliers & Labor
+          </Button>
+        </Pressable>
+        <Pressable>
+          <Button
+            variant={implemented ? "outline" : "ocean"}
+            className={cn(
+              "font-medium",
+              implemented && "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:border-destructive hover:bg-destructive/10 hover:text-destructive",
+            )}
+            onClick={handleToggleImplemented}
+          >
+            {implemented ? (
+              <>
+                <Check className="me-2 h-4 w-4 text-emerald-500" />
+                Implemented (Undo)
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="me-2 h-4 w-4" />
+                Confirm Implementation
+              </>
+            )}
+          </Button>
+        </Pressable>
+        {!isSaved && user && (
+          <Pressable>
+            <Button variant="ocean" onClick={handleSave}>
+              <Save className="me-2 h-4 w-4" />
+              {t("result.saveToAccount")}
+            </Button>
+          </Pressable>
+        )}
+        <Pressable>
+          <Button variant="outline" onClick={onNewAssessment}>
+            <RotateCcw className="me-2 h-4 w-4" />
+            {t("result.newAssessment")}
+          </Button>
+        </Pressable>
+        <Pressable>
+          <Button
+            variant="outline"
+            className="border-[#25D366] bg-[#25D366] text-white hover:bg-[#1ebe5a] hover:text-white"
+            onClick={() => window.open(whatsappUrl(shareMessage(input, result, undefined, user?.name)), "_blank", "noopener")}
+          >
+            <Share2 className="me-2 h-4 w-4" />
+            {t("share.whatsapp")}
+          </Button>
+        </Pressable>
+      </motion.div>
+
+      {/* Maintenance & Installation Vendor/Labor Drawer */}
+      <MaintenanceDrawer open={maintenanceOpen} onOpenChange={setMaintenanceOpen} />
     </div>
   );
 };
