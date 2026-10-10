@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Upload, Download, MapPin, Calculator, AlertTriangle, CheckCircle, Info, Navigation, Home } from 'lucide-react';
+import { Download, AlertTriangle, CheckCircle, Info, Navigation } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
 
 interface Coordinates {
@@ -336,35 +336,19 @@ const SatelliteAnalysis: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <div className="space-y-2">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="text-center md:text-left flex-1">
-            <h1 className="text-3xl font-bold">Satellite Rooftop Analysis</h1>
-            <p className="text-muted-foreground">
-              Calculate rainwater harvesting potential using satellite imagery
-            </p>
-          </div>
-          <div className="flex justify-center md:justify-end">
-            <Button 
-              variant="outline" 
-              onClick={() => window.location.href = '/'}
-              className="flex items-center gap-2"
-            >
-              <Home className="w-4 h-4" />
-              Homepage
-            </Button>
-          </div>
-        </div>
+    <div className="space-y-8 animate-fade-up">
+      <div className="max-w-prose">
+        <p className="eyebrow mb-5">Satellite analysis</p>
+        <h1 className="text-[40px] sm:text-heading-lg">Measure your rooftop from above.</h1>
+        <p className="mt-5 text-body text-slate">
+          Calculate rainwater harvesting potential using satellite imagery of your building.
+        </p>
       </div>
 
       {/* Progress Steps */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="w-5 h-5" />
-            Analysis Progress
-          </CardTitle>
+          <CardTitle className="text-base font-medium">Progress</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -372,17 +356,17 @@ const SatelliteAnalysis: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               {steps.map((step, index) => (
                 <div key={step.id} className="flex flex-col items-center space-y-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    step.status === 'completed' ? 'bg-green-100 text-green-800' :
-                    step.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                    step.status === 'error' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-600'
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-[13px] font-medium ${
+                    step.status === 'completed' ? 'bg-foreground text-white' :
+                    step.status === 'processing' ? 'border border-link bg-card text-foreground' :
+                    step.status === 'error' ? 'bg-destructive/10 text-destructive' :
+                    'border border-border bg-card text-muted-foreground'
                   }`}>
                     {step.status === 'completed' ? <CheckCircle className="w-4 h-4" /> :
                      step.status === 'error' ? <AlertTriangle className="w-4 h-4" /> :
                      index + 1}
                   </div>
-                  <span className="text-xs text-center">{step.name}</span>
+                  <span className="text-xs text-center text-slate">{step.name}</span>
                   {step.message && (
                     <span className="text-xs text-muted-foreground text-center">{step.message}</span>
                   )}
@@ -408,21 +392,21 @@ const SatelliteAnalysis: React.FC = () => {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="coordinates">Coordinates</TabsTrigger>
-          <TabsTrigger value="marking">Mark Rooftop</TabsTrigger>
-          <TabsTrigger value="analysis">Analysis</TabsTrigger>
-          <TabsTrigger value="results">Results</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="h-auto w-max gap-1 rounded-lg bg-secondary p-1">
+            {[["coordinates", "Coordinates"], ["marking", "Mark rooftop"], ["analysis", "Analysis"], ["results", "Results"]].map(([value, label]) => (
+              <TabsTrigger key={value} value={value} className="rounded-md px-3 py-1.5 font-normal data-[state=active]:font-medium data-[state=active]:shadow-subtle">
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
         {/* Step 1: Coordinates */}
         <TabsContent value="coordinates" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="w-5 h-5" />
-                Enter Location Coordinates
-              </CardTitle>
+              <CardTitle className="text-base font-medium">Enter location coordinates</CardTitle>
               <CardDescription>
                 Enter the latitude and longitude of your building location
               </CardDescription>
@@ -463,10 +447,10 @@ const SatelliteAnalysis: React.FC = () => {
                 <Button 
                   onClick={getCurrentLocation} 
                   disabled={loading}
-                  variant="outline"
+                  variant="ghost"
                   className="flex-1"
                 >
-                  <Navigation className="w-4 h-4 mr-2" />
+                  <Navigation className="w-4 h-4" />
                   {loading ? 'Getting Location...' : 'Use Current Location'}
                 </Button>
                 <Button 
@@ -485,10 +469,7 @@ const SatelliteAnalysis: React.FC = () => {
         <TabsContent value="marking" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Download className="w-5 h-5" />
-                Mark Your Rooftop
-              </CardTitle>
+              <CardTitle className="text-base font-medium">Mark your rooftop</CardTitle>
               <CardDescription>
                 Download the satellite image, mark your rooftop with red color, and upload it back
               </CardDescription>
@@ -501,7 +482,7 @@ const SatelliteAnalysis: React.FC = () => {
                       <img 
                         src={satelliteImageUrl} 
                         alt="Satellite view" 
-                        className="max-w-full h-auto border rounded-lg shadow-lg mx-auto"
+                        className="mx-auto h-auto max-w-full rounded-xl border border-border shadow-subtle"
                         style={{ maxHeight: '400px' }}
                       />
                     </div>
@@ -511,7 +492,7 @@ const SatelliteAnalysis: React.FC = () => {
                       className="w-full"
                       variant="outline"
                     >
-                      <Download className="w-4 h-4 mr-2" />
+                      <Download className="w-4 h-4" />
                       Download Satellite Image
                     </Button>
 
@@ -568,10 +549,7 @@ const SatelliteAnalysis: React.FC = () => {
         <TabsContent value="analysis" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="w-5 h-5" />
-                Analyze Rooftop
-              </CardTitle>
+              <CardTitle className="text-base font-medium">Analyze rooftop</CardTitle>
               <CardDescription>
                 Process the marked image and calculate harvesting potential
               </CardDescription>
@@ -612,42 +590,39 @@ const SatelliteAnalysis: React.FC = () => {
             <>
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    Analysis Results
-                  </CardTitle>
+                  <CardTitle className="text-base font-medium">Analysis results</CardTitle>
                   <CardDescription>
                     Rooftop dimensions and rainwater harvesting potential
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">
+                    <div className="rounded-xl border border-border bg-muted p-5">
+                      <div className="text-heading-sm font-extralight text-foreground tabular-nums">
                         {analysisResult.roof_area.toFixed(1)}
                       </div>
-                      <div className="text-sm text-blue-800">Roof Area (m²)</div>
+                      <div className="mt-2 text-xs text-muted-foreground">Roof Area (m²)</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">
+                    <div className="rounded-xl border border-border bg-muted p-5">
+                      <div className="text-heading-sm font-extralight text-foreground tabular-nums">
                         {analysisResult.harvest_potential.annual_harvest_liters.toLocaleString()}
                       </div>
-                      <div className="text-sm text-green-800">Annual Harvest (L)</div>
+                      <div className="mt-2 text-xs text-muted-foreground">Annual Harvest (L)</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-purple-50 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-600">
+                    <div className="rounded-xl border border-border bg-muted p-5">
+                      <div className="text-heading-sm font-extralight text-foreground tabular-nums">
                         {analysisResult.harvest_potential.daily_average_liters}
                       </div>
-                      <div className="text-sm text-purple-800">Daily Average (L)</div>
+                      <div className="mt-2 text-xs text-muted-foreground">Daily Average (L)</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-orange-50 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">
+                    <div className="rounded-xl border border-border bg-muted p-5">
+                      <div className="text-heading-sm font-extralight text-foreground tabular-nums">
                         {analysisResult.rainfall_data.annual.toFixed(0)}
                       </div>
-                      <div className="text-sm text-orange-800">Annual Rainfall (mm)</div>
+                      <div className="mt-2 text-xs text-muted-foreground">Annual Rainfall (mm)</div>
                     </div>
                   </div>
                 </CardContent>
@@ -655,14 +630,14 @@ const SatelliteAnalysis: React.FC = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Monthly Harvest Potential</CardTitle>
+                  <CardTitle className="text-base font-medium">Monthly harvest potential</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
                     {analysisResult.harvest_potential.monthly_harvest_liters.map((harvest, index) => (
-                      <div key={index} className="text-center p-3 bg-gray-50 rounded">
-                        <div className="font-semibold">{harvest.toLocaleString()}L</div>
-                        <div className="text-xs text-gray-600">
+                      <div key={index} className="rounded-lg border border-border bg-card p-3">
+                        <div className="text-sm font-medium text-foreground tabular-nums">{harvest.toLocaleString()} L</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
                           {new Date(0, index).toLocaleDateString('en-US', { month: 'short' })}
                         </div>
                       </div>
@@ -675,7 +650,7 @@ const SatelliteAnalysis: React.FC = () => {
               {analysisResult.cv2_images && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Image Analysis Results</CardTitle>
+                    <CardTitle className="text-base font-medium">Image analysis results</CardTitle>
                     <CardDescription>
                       Computer vision analysis of your marked rooftop
                     </CardDescription>
@@ -684,8 +659,8 @@ const SatelliteAnalysis: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Red Mask Image */}
                       <div className="space-y-2">
-                        <h4 className="font-semibold text-sm">Red Marking Detection</h4>
-                        <div className="border rounded-lg overflow-hidden">
+                        <h4 className="text-sm font-medium">Red Marking Detection</h4>
+                        <div className="overflow-hidden rounded-xl border border-border bg-accent">
                           <img 
                             src={`${API_BASE_URL}/api/cv2-image/${analysisResult.cv2_images.red_mask_path}`}
                             alt="Red marking detection"
@@ -703,8 +678,8 @@ const SatelliteAnalysis: React.FC = () => {
 
                       {/* Contour Analysis Image */}
                       <div className="space-y-2">
-                        <h4 className="font-semibold text-sm">Roof Contour Analysis</h4>
-                        <div className="border rounded-lg overflow-hidden">
+                        <h4 className="text-sm font-medium">Roof Contour Analysis</h4>
+                        <div className="overflow-hidden rounded-xl border border-border bg-accent">
                           <img 
                             src={`${API_BASE_URL}/api/cv2-image/${analysisResult.cv2_images.contour_analysis_path}`}
                             alt="Roof contour analysis"
@@ -727,7 +702,7 @@ const SatelliteAnalysis: React.FC = () => {
               {/* Download Reports Section */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Download Reports</CardTitle>
+                  <CardTitle className="text-base font-medium">Download reports</CardTitle>
                   <CardDescription>
                     Download your analysis results in PDF, TXT, or both formats
                   </CardDescription>
@@ -756,7 +731,7 @@ const SatelliteAnalysis: React.FC = () => {
                     <Button 
                       onClick={downloadBothReports}
                       disabled={loading}
-                      variant="secondary"
+                      variant="ghost"
                       className="flex items-center gap-2"
                     >
                       <Download className="w-4 h-4" />
@@ -773,7 +748,7 @@ const SatelliteAnalysis: React.FC = () => {
               </Card>
 
               <div className="text-center">
-                <Button onClick={resetAnalysis} variant="outline">
+                <Button onClick={resetAnalysis} variant="ghost">
                   Start New Analysis
                 </Button>
               </div>

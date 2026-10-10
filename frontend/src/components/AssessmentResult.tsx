@@ -3,27 +3,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Droplets, 
-  TrendingUp, 
-  AlertTriangle, 
-  Download, 
-  RotateCcw,
-  Home,
-  Calculator,
-  FileText,
-  CheckCircle,
-  XCircle,
-  AlertCircle
-} from "lucide-react";
-import { AssessmentResult as AssessmentResultType, formatCurrency, formatVolume, RECOMMENDATION_LABELS } from "@/lib/api";
-import axios from "axios";
-import { toast } from "@/components/ui/use-toast"; // Assuming Shadcn/UI toast component
+import { Download, RotateCcw } from "lucide-react";
+import { api, AssessmentResult as AssessmentResultType, formatCurrency, formatVolume, RECOMMENDATION_LABELS } from "@/lib/api";
+import { toast } from "@/components/ui/use-toast";
 
 interface AssessmentResultProps {
   result: AssessmentResultType;
   onNewAssessment: () => void;
 }
+
+const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <div className="flex items-baseline justify-between gap-4 border-b border-border py-3 last:border-0">
+    <span className="text-sm text-muted-foreground">{label}</span>
+    <span className="text-sm font-medium text-foreground tabular-nums">{value}</span>
+  </div>
+);
 
 export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultProps) => {
   const getRecommendationColor = (recommendation: string) => {
@@ -33,7 +27,7 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
         return 'success';
       case 'storage_only':
       case 'recharge_only':
-        return 'warning';
+        return 'secondary';
       case 'not_feasible':
         return 'destructive';
       default:
@@ -41,28 +35,10 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
     }
   };
 
-  const getRecommendationIcon = (recommendation: string) => {
-    switch (recommendation) {
-      case 'hybrid':
-      case 'storage_priority_hybrid':
-      case 'storage_only':
-      case 'recharge_only':
-        return CheckCircle;
-      case 'not_feasible':
-        return XCircle;
-      default:
-        return AlertCircle;
-    }
-  };
-
   const handleDownloadReport = async () => {
     try {
-      const response = await axios.get(`/api/generate-report/${result.assessment_id}`, {
-        responseType: 'blob', // Critical for handling binary PDF data
-      });
-
-      // Create a URL for the blob and trigger download
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blob = await api.downloadPdfReport(result.assessment_id);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `RTRWH_Assessment_${result.assessment_id}.pdf`);
@@ -72,257 +48,167 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
       window.URL.revokeObjectURL(url);
 
       toast({
-        title: "Success",
-        description: "Report downloaded successfully",
+        title: "Report downloaded",
+        description: "Your PDF report has been saved.",
       });
     } catch (error) {
       console.error('Download failed:', error);
       toast({
-        title: "Error",
-        description: error.response?.data?.detail || "Failed to download report. Please try again.",
+        title: "Download failed",
+        description: "Failed to download report. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  const RecommendationIcon = getRecommendationIcon(result.recommended_option);
+  const recommendationLabel =
+    RECOMMENDATION_LABELS[result.recommended_option as keyof typeof RECOMMENDATION_LABELS] || result.recommended_option;
+
+  const stats = [
+    { label: "Harvestable volume", value: formatVolume(result.harvestable_volume), note: "per year" },
+    { label: "Annual savings", value: formatCurrency(result.savings_analysis.annual_cost_savings), note: "on water bills" },
+    { label: "Implementation cost", value: formatCurrency(result.cost_analysis.total_cost), note: "one-time investment" },
+  ];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="space-y-10 animate-fade-up">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <h1 className="text-3xl lg:text-4xl font-bold">
-            Assessment <span className="gradient-text">Results</span>
-          </h1>
-          <p className="text-muted-foreground">
-            Comprehensive analysis for rainwater harvesting feasibility
+      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+        <div className="max-w-prose">
+          <p className="eyebrow mb-5">Assessment results</p>
+          <h1 className="text-[40px] sm:text-heading-lg">Your rooftop, in numbers.</h1>
+          <p className="mt-4 text-body text-slate">
+            Feasibility analysis for rainwater harvesting based on your site details.
           </p>
         </div>
-        
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={onNewAssessment}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            New Assessment
+
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={onNewAssessment}>
+            <RotateCcw strokeWidth={1.5} />
+            New assessment
           </Button>
-          <Button variant="ocean" onClick={handleDownloadReport}>
-            <Download className="h-4 w-4 mr-2" />
-            Download Report
+          <Button onClick={handleDownloadReport}>
+            <Download strokeWidth={1.5} />
+            Download report
           </Button>
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Droplets className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Harvestable Volume</p>
-                <p className="text-2xl font-bold">{formatVolume(result.harvestable_volume)}</p>
-                <p className="text-xs text-success">per year</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-accent" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Annual Savings</p>
-                <p className="text-2xl font-bold">{formatCurrency(result.savings_analysis.annual_cost_savings)}</p>
-                <p className="text-xs text-success">cost reduction</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="h-12 w-12 rounded-lg bg-warning/10 flex items-center justify-center">
-                <Calculator className="h-6 w-6 text-warning" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Implementation Cost</p>
-                <p className="text-2xl font-bold">{formatCurrency(result.cost_analysis.total_cost)}</p>
-                <p className="text-xs text-muted-foreground">one-time investment</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Key figures */}
+      <div className="grid gap-4 md:grid-cols-3">
+        {stats.map((stat) => (
+          <div key={stat.label} className="surface p-6">
+            <p className="eyebrow">{stat.label}</p>
+            <p className="mt-4 text-heading font-extralight text-foreground tabular-nums">{stat.value}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{stat.note}</p>
+          </div>
+        ))}
       </div>
 
       {/* Recommendation */}
-      <Card className="glass-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <RecommendationIcon className="h-6 w-6 text-primary" />
-            <span>Recommendation</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center space-x-4">
-            <Badge 
-              variant={getRecommendationColor(result.recommended_option)} 
-              className="text-sm px-4 py-2"
-            >
-              {RECOMMENDATION_LABELS[result.recommended_option as keyof typeof RECOMMENDATION_LABELS] || result.recommended_option}
-            </Badge>
-            <p className="text-muted-foreground">
-              Based on your site conditions and requirements
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted px-6 py-5 sm:flex-row sm:items-center sm:gap-4">
+        <span className="eyebrow">Recommendation</span>
+        <Badge variant={getRecommendationColor(result.recommended_option)} className="w-fit rounded-full px-3 py-1 text-[13px]">
+          {recommendationLabel}
+        </Badge>
+        <p className="text-sm text-muted-foreground">Based on your site conditions and requirements.</p>
+      </div>
 
       {/* Detailed Analysis */}
       <Tabs defaultValue="technical" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="technical">Technical Details</TabsTrigger>
-          <TabsTrigger value="costs">Cost Analysis</TabsTrigger>
-          <TabsTrigger value="boq">Bill of Quantities</TabsTrigger>
-          <TabsTrigger value="safety">Safety Checks</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="h-auto w-max gap-1 rounded-lg bg-secondary p-1">
+            <TabsTrigger value="technical" className="rounded-md px-3 py-1.5 font-normal data-[state=active]:font-medium data-[state=active]:shadow-subtle">Technical details</TabsTrigger>
+            <TabsTrigger value="costs" className="rounded-md px-3 py-1.5 font-normal data-[state=active]:font-medium data-[state=active]:shadow-subtle">Cost analysis</TabsTrigger>
+            <TabsTrigger value="boq" className="rounded-md px-3 py-1.5 font-normal data-[state=active]:font-medium data-[state=active]:shadow-subtle">Bill of quantities</TabsTrigger>
+            <TabsTrigger value="safety" className="rounded-md px-3 py-1.5 font-normal data-[state=active]:font-medium data-[state=active]:shadow-subtle">Safety checks</TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="technical" className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Storage Requirements */}
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Home className="h-5 w-5 text-primary" />
-                  <span>Storage System</span>
-                </CardTitle>
+        <TabsContent value="technical">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-medium">Storage system</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Required Volume</span>
-                    <span className="font-medium">{formatVolume(result.storage_recommendation.required_volume)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Recommended Volume</span>
-                    <span className="font-medium">{formatVolume(result.storage_recommendation.recommended_volume)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Storage Duration</span>
-                    <span className="font-medium">{result.storage_recommendation.storage_days} days</span>
-                  </div>
-                </div>
+              <CardContent>
+                <Row label="Required volume" value={formatVolume(result.storage_recommendation.required_volume)} />
+                <Row label="Recommended volume" value={formatVolume(result.storage_recommendation.recommended_volume)} />
+                <Row label="Storage duration" value={`${result.storage_recommendation.storage_days} days`} />
               </CardContent>
             </Card>
 
-            {/* Recharge System */}
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Droplets className="h-5 w-5 text-accent" />
-                  <span>Recharge System</span>
-                </CardTitle>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-medium">Recharge system</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Pit Diameter</span>
-                    <span className="font-medium">{result.recharge_recommendation.recharge_pit.diameter}m</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Pit Depth</span>
-                    <span className="font-medium">{result.recharge_recommendation.recharge_pit.depth}m</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Suitability Score</span>
-                    <span className="font-medium">{result.recharge_recommendation.suitability_score}</span>
-                    
-                  </div>
-                </div>
-                <Progress value={result.recharge_recommendation.suitability_score * 10} className="h-2" />
+              <CardContent>
+                <Row label="Pit diameter" value={`${result.recharge_recommendation.recharge_pit.diameter} m`} />
+                <Row label="Pit depth" value={`${result.recharge_recommendation.recharge_pit.depth} m`} />
+                <Row label="Suitability score" value={`${result.recharge_recommendation.suitability_score} / 10`} />
+                <Progress value={result.recharge_recommendation.suitability_score * 10} className="mt-4" />
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="costs" className="space-y-6">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle>Cost Breakdown</CardTitle>
-              <CardDescription>Detailed implementation and operational costs</CardDescription>
+        <TabsContent value="costs">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium">Cost breakdown</CardTitle>
+              <CardDescription>Implementation costs including labour and tax.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {Object.entries(result.cost_analysis).map(([key, value]) => (
-                  key !== 'total_cost' && (
-                    <div key={key} className="flex justify-between items-center py-2 border-b border-border/30">
-                      <span className="text-sm text-muted-foreground capitalize">
-                        {key.replace(/_/g, ' ')}
-                      </span>
-                      <span className="font-medium">{formatCurrency(value as number)}</span>
-                    </div>
-                  )
-                ))}
-                <div className="flex justify-between items-center py-3 border-t-2 border-primary/20">
-                  <span className="text-lg font-semibold">Total Cost</span>
-                  <span className="text-lg font-bold text-primary">{formatCurrency(result.cost_analysis.total_cost)}</span>
-                </div>
+              {Object.entries(result.cost_analysis).map(([key, value]) => (
+                key !== 'total_cost' && (
+                  <Row key={key} label={key.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())} value={formatCurrency(value as number)} />
+                )
+              ))}
+              <div className="mt-2 flex items-baseline justify-between border-t border-foreground/80 pt-4">
+                <span className="text-sm font-medium text-foreground">Total cost</span>
+                <span className="text-heading-sm font-extralight text-foreground tabular-nums">{formatCurrency(result.cost_analysis.total_cost)}</span>
               </div>
 
-              <div className="mt-6 p-4 bg-muted/30 rounded-lg">
-                <h4 className="font-medium mb-2">Savings Analysis</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Monthly Savings</span>
-                    <span className="font-medium text-success">{formatCurrency(result.savings_analysis.monthly_savings)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Payback Period</span>
-                    <span className="font-medium">{result.payback_period || Math.ceil(result.cost_analysis.total_cost / result.savings_analysis.annual_cost_savings)} years</span>
-                  </div>
-                </div>
+              <div className="mt-6 rounded-xl bg-muted px-5 py-2">
+                <Row label="Monthly savings" value={formatCurrency(result.savings_analysis.monthly_savings)} />
+                <Row
+                  label="Payback period"
+                  value={`${result.payback_period || Math.ceil(result.cost_analysis.total_cost / result.savings_analysis.annual_cost_savings)} years`}
+                />
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="boq" className="space-y-6">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <FileText className="h-5 w-5 text-primary" />
-                <span>Bill of Quantities</span>
-              </CardTitle>
-              <CardDescription>Detailed material and labor requirements</CardDescription>
+        <TabsContent value="boq">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium">Bill of quantities</CardTitle>
+              <CardDescription>Material and labour requirements.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[520px]">
                   <thead>
-                    <tr className="border-b border-border/50">
-                      <th className="text-left p-2 text-sm font-medium text-muted-foreground">Item</th>
-                      <th className="text-right p-2 text-sm font-medium text-muted-foreground">Quantity</th>
-                      <th className="text-right p-2 text-sm font-medium text-muted-foreground">Rate</th>
-                      <th className="text-right p-2 text-sm font-medium text-muted-foreground">Amount</th>
+                    <tr className="border-b border-border">
+                      <th className="eyebrow py-3 pr-4 text-left font-medium">Item</th>
+                      <th className="eyebrow px-4 py-3 text-right font-medium">Quantity</th>
+                      <th className="eyebrow px-4 py-3 text-right font-medium">Rate</th>
+                      <th className="eyebrow py-3 pl-4 text-right font-medium">Amount</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="tabular-nums">
                     {result.bill_of_quantities.items.map((item, index) => (
-                      <tr key={index} className="border-b border-border/30">
-                        <td className="p-2 text-sm">{item.item}</td>
-                        <td className="p-2 text-sm text-right">{item.quantity}</td>
-                        <td className="p-2 text-sm text-right">{formatCurrency(item.rate)}</td>
-                        <td className="p-2 text-sm text-right font-medium">{formatCurrency(item.amount)}</td>
+                      <tr key={index} className="border-b border-border">
+                        <td className="py-3 pr-4 text-sm text-foreground">{item.item}</td>
+                        <td className="px-4 py-3 text-right text-sm text-slate">{item.quantity}</td>
+                        <td className="px-4 py-3 text-right text-sm text-slate">{formatCurrency(item.rate)}</td>
+                        <td className="py-3 pl-4 text-right text-sm font-medium text-foreground">{formatCurrency(item.amount)}</td>
                       </tr>
                     ))}
-                    <tr className="border-t-2 border-primary/20">
-                      <td colSpan={3} className="p-2 text-right font-semibold">Total</td>
-                      <td className="p-2 text-right font-bold text-primary">{formatCurrency(result.bill_of_quantities.total_cost)}</td>
+                    <tr>
+                      <td colSpan={3} className="pt-4 text-right text-sm font-medium text-foreground">Total</td>
+                      <td className="pl-4 pt-4 text-right text-subheading font-extralight text-foreground">{formatCurrency(result.bill_of_quantities.total_cost)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -331,29 +217,25 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
           </Card>
         </TabsContent>
 
-        <TabsContent value="safety" className="space-y-6">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <AlertTriangle className="h-5 w-5 text-warning" />
-                <span>Safety & Compliance</span>
-              </CardTitle>
-              <CardDescription>Important considerations and requirements</CardDescription>
+        <TabsContent value="safety">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium">Safety & compliance</CardTitle>
+              <CardDescription>Important considerations and requirements.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {result.safety_checks.map((check, index) => (
-                  <div key={index} className={`p-3 rounded-lg border-l-4 ${
-                    check.includes('CRITICAL') 
-                      ? 'bg-destructive/10 border-destructive' 
-                      : check.includes('WARNING')
-                      ? 'bg-warning/10 border-warning'
-                      : 'bg-primary/10 border-primary'
-                  }`}>
-                    <p className="text-sm">{check}</p>
+            <CardContent className="space-y-2">
+              {result.safety_checks.map((check, index) => {
+                const tone = check.includes('CRITICAL')
+                  ? 'border-l-destructive'
+                  : check.includes('WARNING') || check.includes('REQUIRED')
+                  ? 'border-l-warning'
+                  : 'border-l-silver';
+                return (
+                  <div key={index} className={`rounded-lg border border-l-2 border-border bg-card px-4 py-3 ${tone}`}>
+                    <p className="text-sm text-slate">{check}</p>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </CardContent>
           </Card>
         </TabsContent>

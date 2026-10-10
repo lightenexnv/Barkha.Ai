@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { MapPin, Home, Droplets, Gauge, Loader2 } from "lucide-react";
+import { MapPin, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { api, SiteDetailsInput, ROOF_MATERIALS, ROOF_CONDITIONS, SOIL_TYPES } from "@/lib/api";
 
@@ -115,26 +115,23 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <Card className="glass-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Droplets className="h-6 w-6 text-primary" />
-            <span>Rainwater Harvesting Assessment</span>
-          </CardTitle>
+    <div className="max-w-[760px] animate-fade-up" style={{ animationDelay: "80ms" }}>
+      <Card>
+        <CardHeader className="border-b border-border p-6 sm:px-8">
+          <CardTitle>Site details</CardTitle>
           <CardDescription>
-            Fill in the details below to get a comprehensive feasibility analysis for your site
+            Fill in the details below to get a feasibility analysis for your site.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6 sm:p-8">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
               
               {/* Site Information */}
               <div className="space-y-4">
-                <div className="flex items-center space-x-2 text-lg font-semibold">
-                  <Home className="h-5 w-5 text-accent" />
-                  <span>Site Information</span>
+                <div className="flex items-center gap-3">
+                  <span className="key-chip">01</span>
+                  <h3 className="text-base font-medium">Site information</h3>
                 </div>
 
                 <FormField
@@ -200,16 +197,16 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
                   onClick={getCurrentLocation}
                   className="w-fit"
                 >
-                  <MapPin className="h-4 w-4 mr-2" />
-                  Use Current Location
+                  <MapPin strokeWidth={1.5} />
+                  Use current location
                 </Button>
               </div>
 
               {/* Roof Details */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2 text-lg font-semibold">
-                  <Home className="h-5 w-5 text-accent" />
-                  <span>Roof Details</span>
+              <div className="space-y-4 border-t border-border pt-10">
+                <div className="flex items-center gap-3">
+                  <span className="key-chip">02</span>
+                  <h3 className="text-base font-medium">Roof details</h3>
                 </div>
 
                 <FormField
@@ -286,10 +283,10 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
               </div>
 
               {/* Site Conditions */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2 text-lg font-semibold">
-                  <Gauge className="h-5 w-5 text-accent" />
-                  <span>Site Conditions</span>
+              <div className="space-y-4 border-t border-border pt-10">
+                <div className="flex items-center gap-3">
+                  <span className="key-chip">03</span>
+                  <h3 className="text-base font-medium">Site conditions</h3>
                 </div>
 
                 <FormField
@@ -365,25 +362,25 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
               </div>
 
               {/* Submit Button */}
+              <div className="border-t border-border pt-8">
               <Button 
                 type="submit" 
                 size="lg" 
-                variant="ocean" 
-                className="w-full" 
+                className="w-full sm:w-auto" 
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating Assessment...
+                    <Loader2 className="animate-spin" />
+                    Generating assessment…
                   </>
                 ) : (
                   <>
-                    <Droplets className="h-4 w-4 mr-2" />
-                    Generate Assessment
+                    Generate assessment
                   </>
                 )}
               </Button>
+              </div>
             </form>
           </Form>
         </CardContent>
