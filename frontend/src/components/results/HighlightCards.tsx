@@ -4,6 +4,7 @@ import { InfoTip } from "@/components/InfoTip";
 import { fadeUp, stagger } from "@/components/motion/presets";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatCurrency } from "@/lib/api";
+import { tankersPerYear } from "@/lib/saral";
 import { cn } from "@/lib/utils";
 
 interface HighlightCardsProps {
@@ -100,7 +101,7 @@ export const HighlightCards = ({
         icon={<Droplets className="h-6 w-6" />}
         label={t("highlight.harvest")}
         value={`${harvestM3.toLocaleString(locale, { maximumFractionDigits: 1 })} m³`}
-        sub={t("highlight.harvestSub", { litres })}
+        sub={t("highlight.harvestSub", { litres, tankers: tankersPerYear(harvestM3) })}
         tip={t("highlight.harvestTip")}
       />
       <Card

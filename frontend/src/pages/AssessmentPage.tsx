@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AssessmentResult } from "@/components/AssessmentResult";
 import { AssessmentWizard, type WizardSeed } from "@/components/assessment/AssessmentWizard";
-import { AssessmentResult as AssessmentResultType, SiteDetailsInput } from "@/lib/api";
+import { api, AssessmentResult as AssessmentResultType, SiteDetailsInput } from "@/lib/api";
+import { readPlanLink } from "@/lib/share";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { getAssessment } from "@/lib/historyService";
@@ -26,9 +28,42 @@ const AssessmentPage = () => {
   const { toast } = useToast();
 
   // ?view=<id> reopens a saved assessment; ?prefill=<id> starts the workflow
-  // from a saved analysis
+  // from a saved analysis; ?plan=<data> rebuilds a shared plan
   const viewId = searchParams.get("view");
   const prefillId = searchParams.get("prefill");
+  const sharedPlan = searchParams.get("plan");
+  const location = useLocation();
+  const [loadingShared, setLoadingShared] = useState(false);
+
+  // A plan handed over by the Saral voice assistant
+  useEffect(() => {
+    const handed = (location.state as { saralPlan?: SavedView } | null)?.saralPlan;
+    if (handed) {
+      setSaved(handed);
+      window.history.replaceState({}, "");
+    }
+  }, [location.state]);
+
+  // A plan opened from a shared WhatsApp link: recompute it from its inputs
+  useEffect(() => {
+    if (!sharedPlan) return;
+    const input = readPlanLink(sharedPlan);
+    if (!input) {
+      toast({ title: t("share.badLink"), variant: "destructive" });
+      setSearchParams({}, { replace: true });
+      return;
+    }
+    let cancelled = false;
+    setLoadingShared(true);
+    api
+      .createAssessment(input)
+      .then((result) => !cancelled && setSaved({ result, input }))
+      .catch(() => !cancelled && toast({ title: t("toast.assessmentFailed"), description: t("toast.assessmentFailedDesc"), variant: "destructive" }))
+      .finally(() => !cancelled && setLoadingShared(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [sharedPlan, t, toast, setSearchParams]);
 
   // Handle each link once, so a language change doesn't reset work in progress
   const handledLink = useRef<string | null>(null);
@@ -64,7 +99,7 @@ const AssessmentPage = () => {
     setSaved(null);
     setSeed(undefined);
     setWizardKey((key) => key + 1);
-    if (viewId || prefillId) setSearchParams({}, { replace: true });
+    if (viewId || prefillId || sharedPlan) setSearchParams({}, { replace: true });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -73,7 +108,11 @@ const AssessmentPage = () => {
       <Header />
 
       <main className="container mx-auto flex-1 px-4 py-8 sm:px-6 lg:px-8">
-        {saved ? (
+        {loadingShared && !saved ? (
+          <div className="flex min-h-[50vh] items-center justify-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          </div>
+        ) : saved ? (
           <AssessmentResult result={saved.result} input={saved.input} onNewAssessment={startNew} />
         ) : (
           <div className="space-y-8">

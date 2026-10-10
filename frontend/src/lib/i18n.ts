@@ -447,7 +447,7 @@ export const en = {
   "result.goodToKnowCount": "{count} important note(s) for your site",
   "result.goodToKnowNone": "Simple tips to keep your system safe",
   "highlight.harvest": "Rainwater you can collect",
-  "highlight.harvestSub": "about {litres} litres every year",
+  "highlight.harvestSub": "≈ {tankers} water tankers ({litres} litres) a year",
   "highlight.harvestTip": "Rain on your roof in an average year, after losses from the roof surface and the first dirty rain that is thrown away.",
   "highlight.monthly": "Money saved each month",
   "highlight.monthlySub": "{yearly} a year",
@@ -479,6 +479,7 @@ export const en = {
   "highlight.beforeSubsidy": "{years} without the subsidy",
   "highlight.paybackTipSubsidy": "Cost after your chosen subsidy, divided by the money you save each year.",
   "highlight.withSubsidy": "with subsidy",
+  "share.badLink": "This plan link is broken or incomplete.",
 } as const;
 
 export type TranslationKey = keyof typeof en;

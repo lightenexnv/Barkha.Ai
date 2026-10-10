@@ -12,6 +12,7 @@ import { SettingsProvider } from "@/context/SettingsContext";
 import Dashboard from "./pages/Dashboard";
 import AssessmentPage from "./pages/AssessmentPage";
 import SettingsPage from "./pages/SettingsPage";
+import { SaralAssistant } from "@/components/saral/SaralAssistant";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
               <Sonner />
               <AuthModal />
               <BrowserRouter>
+                <SaralAssistant />
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/assess" element={<AssessmentPage />} />
