@@ -1,10 +1,12 @@
 // Professional Maintenance, Installation & Vendor Directory Drawer
 // Powered by TinyFish AI Crawler to scrape, rank, and connect nearby sanitary shops, STP suppliers, and labor.
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { reverseGeocode } from "@/lib/climate";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CalendarCheck,
   CheckCircle2,
+  Crosshair,
   ExternalLink,
   Filter,
   Hammer,
@@ -44,25 +46,29 @@ const UPKEEP = [
 export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"vendors" | "workflow">("vendors");
-  const [searchLocation, setSearchLocation] = useState("Jaipur");
+  // Filled from the user's current location when the drawer opens; always editable
+  const [searchLocation, setSearchLocation] = useState("");
+  const [locating, setLocating] = useState(false);
+  const editedByUser = useRef(false);
+  const detectedOnce = useRef(false);
   const [vendors, setVendors] = useState<Vendor[]>(CURATED_VENDORS);
   const [isSearching, setIsSearching] = useState(false);
   const [filterCategory, setFilterCategory] = useState<"all" | "sanitary" | "stp" | "labor" | "testing">("all");
   const [booked, setBooked] = useState(false);
 
   // Live scrape & search using TinyFish API
-  const handleTinyFishSearch = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!searchLocation.trim()) return;
-
+  const searchVendors = useCallback(async (place: string, quiet = false) => {
+    if (!place.trim()) return;
     setIsSearching(true);
     try {
-      const res = await searchTinyFishVendors(searchLocation.trim());
+      const res = await searchTinyFishVendors(place.trim());
       setVendors(res.vendors);
-      toast({
-        title: "TinyFish AI Scan Completed",
-        description: `Discovered and ranked verified sanitary shops and labor in ${searchLocation}.`,
-      });
+      if (!quiet) {
+        toast({
+          title: "TinyFish AI Scan Completed",
+          description: `Discovered and ranked verified sanitary shops and labor in ${place}.`,
+        });
+      }
     } catch (err) {
       console.error("Search failed:", err);
       toast({
@@ -73,7 +79,47 @@ export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpe
     } finally {
       setIsSearching(false);
     }
+  }, [toast]);
+
+  const handleTinyFishSearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    void searchVendors(searchLocation);
   };
+
+  /** Fill the box with "locality, city" from GPS and search there (unless the user typed something). */
+  const detectLocation = useCallback(
+    (force = false) => {
+      if (!navigator.geolocation) return;
+      setLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        async ({ coords }) => {
+          try {
+            const place = await reverseGeocode(coords.latitude, coords.longitude);
+            const label = [place.locality, place.city || place.district].filter((part, i, all) => part && all.indexOf(part) === i).join(", ");
+            if (label && (force || !editedByUser.current)) {
+              editedByUser.current = false;
+              setSearchLocation(label);
+              void searchVendors(label, true);
+            }
+          } catch {
+            // Keep whatever is in the box; the user can type a place
+          } finally {
+            setLocating(false);
+          }
+        },
+        () => setLocating(false),
+        { enableHighAccuracy: false, timeout: 12000, maximumAge: 10 * 60 * 1000 },
+      );
+    },
+    [searchVendors],
+  );
+
+  useEffect(() => {
+    if (open && !detectedOnce.current) {
+      detectedOnce.current = true;
+      detectLocation();
+    }
+  }, [open, detectLocation]);
 
   const filteredVendors = vendors.filter((v) => {
     if (filterCategory === "all") return true;
@@ -132,10 +178,24 @@ export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpe
                   <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={searchLocation}
-                    onChange={(e) => setSearchLocation(e.target.value)}
-                    placeholder="Enter city or area (e.g. Jaipur, Mansarovar...)"
-                    className="pl-9 h-10 text-sm"
+                    onChange={(e) => {
+                      editedByUser.current = true;
+                      setSearchLocation(e.target.value);
+                    }}
+                    placeholder={locating ? "Detecting your location…" : "Enter city or area (e.g. Jaipur, Mansarovar...)"}
+                    aria-label="Your city or area"
+                    className="pl-9 pr-10 h-10 text-sm"
                   />
+                  <button
+                    type="button"
+                    onClick={() => detectLocation(true)}
+                    disabled={locating}
+                    title="Use my current location"
+                    aria-label="Use my current location"
+                    className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-primary hover:bg-primary/10 disabled:opacity-60"
+                  >
+                    {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
+                  </button>
                 </div>
                 <Button type="submit" variant="ocean" className="h-10 px-4 font-semibold shrink-0" disabled={isSearching}>
                   {isSearching ? (

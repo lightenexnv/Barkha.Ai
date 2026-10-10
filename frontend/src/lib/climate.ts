@@ -6,6 +6,8 @@
 
 export interface Place {
   displayName: string;
+  /** Neighbourhood or suburb, when known (e.g. "Mansarovar") */
+  locality?: string;
   city: string;
   district: string;
   state: string;
@@ -78,6 +80,8 @@ interface NominatimAddress {
   town?: string;
   village?: string;
   suburb?: string;
+  neighbourhood?: string;
+  city_district?: string;
   municipality?: string;
   state_district?: string;
   county?: string;
@@ -87,9 +91,14 @@ interface NominatimAddress {
   country_code?: string;
 }
 
+// "Jaipur Municipal Corporation" -> "Jaipur": local-body names are not what people call their town
+const CIVIC_SUFFIX = /\s+(municipal corporation|metropolitan corporation|municipal council|municipality|nagar nigam|nagar palika|cantonment board|corporation)$/i;
+const plainName = (name = "") => name.replace(CIVIC_SUFFIX, "").trim();
+
 const toPlace = (displayName: string, address: NominatimAddress = {}): Place => ({
   displayName,
-  city: address.city || address.town || address.village || address.municipality || address.suburb || "",
+  locality: address.suburb || address.neighbourhood || address.city_district || "",
+  city: plainName(address.city || address.town || address.village || address.municipality || address.suburb || ""),
   district: (address.state_district || address.district || address.county || "").replace(/\s+District$/i, ""),
   state: address.state || "",
   country: address.country || "",
