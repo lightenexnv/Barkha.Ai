@@ -1,19 +1,10 @@
 import logging
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
 import redis
 from pymongo import MongoClient
 
-from core.config import DATABASE_URL, REDIS_URL, MONGODB_URL
+from core.config import REDIS_URL, MONGODB_URL, MONGODB_DB_NAME
 
 logger = logging.getLogger(__name__)
-
-# Database setup (PostgreSQL or SQLite fallback)
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
 
 # Safe Redis setup
 class SafeRedis:
@@ -50,11 +41,6 @@ class SafeRedis:
 
 redis_client = SafeRedis(REDIS_URL)
 
-# MongoDB setup
-try:
-    mongo_client = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=2000) if MONGODB_URL else None
-    mongo_db = mongo_client.rtrwh_offline if mongo_client else None
-except Exception as e:
-    logger.warning(f"Could not initialize MongoDB client: {e}")
-    mongo_client = None
-    mongo_db = None
+# MongoDB setup (primary data store)
+mongo_client = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=5000, tz_aware=False)
+mongo_db = mongo_client[MONGODB_DB_NAME]

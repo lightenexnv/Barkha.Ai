@@ -1,9 +1,5 @@
 # app/core/dependencies.py
-from core.database import SessionLocal
+from core.database import mongo_db
 
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    return mongo_db

@@ -1,14 +1,14 @@
 # app/api/endpoints.py
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 from typing import List, Dict
 import json
 import os
 from pathlib import Path
 from datetime import datetime
 import logging
-from core.database import SessionLocal, redis_client, mongo_db
+from core.database import redis_client
 from core.dependencies import get_db
 from models.db_models import Assessment, LocalConfig
 from models.pydantic_models import SiteDetailsInput, AssessmentResult, ConfigData
@@ -21,10 +21,15 @@ from typing import Optional
 
 router = APIRouter()
 calculator = RTRWHCalculator()
-logger = logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+
+
+def find_assessment(db: Database, assessment_id: str) -> Optional[Assessment]:
+    doc = db.assessments.find_one({"_id": assessment_id})
+    return Assessment.from_doc(doc) if doc else None
 
 @router.post("/assess", response_model=AssessmentResult)
-async def create_assessment(site_data: SiteDetailsInput, db: Session = Depends(get_db)):
+async def create_assessment(site_data: SiteDetailsInput, db: Database = Depends(get_db)):
     logging.info(f"Received site_data: {site_data.model_dump()}")
     harvestable_volume = calculator.calculate_harvestable_volume(
         site_data.roof_area, site_data.annual_rainfall, site_data.roof_material, site_data.roof_condition
@@ -59,9 +64,7 @@ async def create_assessment(site_data: SiteDetailsInput, db: Session = Depends(g
         }
     )
     
-    db.add(assessment)
-    db.commit()
-    db.refresh(assessment)
+    db.assessments.insert_one(assessment.to_doc())
     
     result_key = f"assessment:{assessment.id}"
     redis_client.setex(result_key, 3600, json.dumps({
@@ -82,33 +85,32 @@ async def create_assessment(site_data: SiteDetailsInput, db: Session = Depends(g
     )
     
 @router.get("/assessments")
-async def get_assessments(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    assessments = db.query(Assessment).offset(skip).limit(limit).all()
-    return assessments
+async def get_assessments(skip: int = 0, limit: int = 100, db: Database = Depends(get_db)):
+    docs = db.assessments.find().sort("created_at", -1).skip(skip).limit(limit)
+    return [Assessment.from_doc(doc).to_dict() for doc in docs]
 
 @router.get("/assessments/{assessment_id}")
-async def get_assessment(assessment_id: str, db: Session = Depends(get_db)):
-    assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+async def get_assessment(assessment_id: str, db: Database = Depends(get_db)):
+    assessment = find_assessment(db, assessment_id)
     if not assessment:
         raise HTTPException(status_code=404, detail="Assessment not found")
-    return assessment
+    return assessment.to_dict()
 
 @router.post("/config")
-async def update_config(config: ConfigData, db: Session = Depends(get_db)):
+async def update_config(config: ConfigData, db: Database = Depends(get_db)):
     local_config = LocalConfig(
         region=config.region, rainfall_data=config.rainfall_data,
         soil_data=config.soil_data, cost_data=config.cost_data, tariff_data=config.tariff_data
     )
-    db.add(local_config)
-    db.commit()
+    db.local_configs.insert_one(local_config.to_doc())
     redis_client.setex(f"config:{config.region}", 86400, json.dumps(config.model_dump()))
     return {"message": "Configuration updated successfully"}
 
 @router.get("/generate-report/{assessment_id}")
-async def generate_pdf_report(assessment_id: str, db: Session = Depends(get_db)):
+async def generate_pdf_report(assessment_id: str, db: Database = Depends(get_db)):
     try:
         # Fetch assessment
-        assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+        assessment = find_assessment(db, assessment_id)
         if not assessment:
             logging.error(f"Assessment {assessment_id} not found")
             raise HTTPException(status_code=404, detail="Assessment not found")
@@ -166,13 +168,13 @@ async def generate_pdf_report(assessment_id: str, db: Session = Depends(get_db))
 
 
 @router.get("/generate-text-report/{assessment_id}")
-async def generate_text_report(assessment_id: str, db: Session = Depends(get_db)):
+async def generate_text_report(assessment_id: str, db: Database = Depends(get_db)):
     """
     Generate and download TXT report for an assessment
     """
     try:
         # Get assessment from database
-        assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+        assessment = find_assessment(db, assessment_id)
         if not assessment:
             raise HTTPException(status_code=404, detail="Assessment not found")
         
@@ -218,14 +220,14 @@ async def generate_text_report(assessment_id: str, db: Session = Depends(get_db)
 
 
 @router.get("/download-reports/{assessment_id}")
-async def download_both_reports(assessment_id: str, db: Session = Depends(get_db)):
+async def download_both_reports(assessment_id: str, db: Database = Depends(get_db)):
     """
     Generate and download both PDF and TXT reports for an assessment
     Returns a ZIP file containing both reports
     """
     try:
         # Get assessment from database
-        assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+        assessment = find_assessment(db, assessment_id)
         if not assessment:
             raise HTTPException(status_code=404, detail="Assessment not found")
         
@@ -288,8 +290,8 @@ async def download_both_reports(assessment_id: str, db: Session = Depends(get_db
         raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
 
 @router.post("/upload-photos/{assessment_id}")
-async def upload_site_photos(assessment_id: str, files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
-    assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+async def upload_site_photos(assessment_id: str, files: List[UploadFile] = File(...), db: Database = Depends(get_db)):
+    assessment = find_assessment(db, assessment_id)
     if not assessment:
         raise HTTPException(status_code=404, detail="Assessment not found")
     
@@ -304,28 +306,16 @@ async def upload_site_photos(assessment_id: str, files: List[UploadFile] = File(
             buffer.write(content)
         photo_paths.append(str(file_path))
     
-    assessment.site_photos = photo_paths
-    db.commit()
+    db.assessments.update_one(
+        {"_id": assessment.id},
+        {"$set": {"site_photos": photo_paths, "updated_at": datetime.now()}}
+    )
     return {"message": f"Uploaded {len(files)} photos successfully"}
 
 @router.get("/offline-sync")
-async def sync_offline_data():
-    offline_assessments = list(mongo_db.assessments.find({"is_synced": False}))
-    synced_count = 0
-    db = SessionLocal()
-    
-    try:
-        for offline_data in offline_assessments:
-            assessment = Assessment(**{k: v for k, v in offline_data.items() if k != '_id'})
-            assessment.is_synced = True
-            db.add(assessment)
-            mongo_db.assessments.update_one({"_id": offline_data["_id"]}, {"$set": {"is_synced": True}})
-            synced_count += 1
-        db.commit()
-    finally:
-        db.close()
-    
-    return {"message": f"Synced {synced_count} offline assessments"}
+async def sync_offline_data(db: Database = Depends(get_db)):
+    result = db.assessments.update_many({"is_synced": False}, {"$set": {"is_synced": True}})
+    return {"message": f"Synced {result.modified_count} offline assessments"}
 
 
 @router.post("/satellite-image")
@@ -394,7 +384,7 @@ async def analyze_rooftop_dimensions(
     latitude: float, 
     longitude: float, 
     marked_image: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Database = Depends(get_db)
 ):
     """
     Analyze marked rooftop image and calculate dimensions and harvesting potential
@@ -448,9 +438,7 @@ async def analyze_rooftop_dimensions(
                 recommendations={}
             )
             
-            db.add(rooftop_analysis)
-            db.commit()
-            db.refresh(rooftop_analysis)
+            db.assessments.insert_one(rooftop_analysis.to_doc())
             
             # Clean up satellite image if it exists
             if "satellite_image_path" in analysis_result:
@@ -588,7 +576,7 @@ async def quick_rooftop_analysis(
 async def create_assessment_with_satellite(
     site_data: SiteDetailsInput,
     marked_image: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db)
+    db: Database = Depends(get_db)
 ):
     """
     Create assessment with optional satellite-based roof area calculation
@@ -683,9 +671,7 @@ async def create_assessment_with_satellite(
             }
         )
         
-        db.add(assessment)
-        db.commit()
-        db.refresh(assessment)
+        db.assessments.insert_one(assessment.to_doc())
         
         result_key = f"assessment:{assessment.id}"
         redis_client.setex(result_key, 3600, json.dumps({

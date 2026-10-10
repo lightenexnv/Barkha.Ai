@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: barkha-ai-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: MONGODB_URL
+        sync: false # set in the Render dashboard (MongoDB Atlas connection string)
+      - key: MONGODB_DB_NAME
+        value: barkha_ai
+      - key: CORS_ORIGINS
+        sync: false # set to your Vercel URL, e.g. https://barkha-ai.vercel.app

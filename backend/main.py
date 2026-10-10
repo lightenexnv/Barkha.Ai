@@ -1,11 +1,13 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 
-from core.database import Base, engine
+from core.config import CORS_ORIGINS
+from core.database import mongo_client, mongo_db
 from api.endpoints import router as api_router
 
-Base.metadata.create_all(bind=engine)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="RTRWH Assessment API",
@@ -15,17 +17,31 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    # Browsers reject credentialed requests to a wildcard origin
+    allow_credentials="*" not in CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(api_router, prefix="/api")
 
+@app.on_event("startup")
+def create_indexes():
+    try:
+        mongo_db.assessments.create_index("created_at")
+        mongo_db.assessments.create_index("is_synced")
+    except Exception as e:
+        logger.warning(f"Could not create MongoDB indexes: {e}")
+
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now()}
+    try:
+        mongo_client.admin.command("ping")
+        database = "connected"
+    except Exception:
+        database = "unreachable"
+    return {"status": "healthy", "database": database, "timestamp": datetime.now()}
 
 @app.get("/")
 async def root():

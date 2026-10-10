@@ -9,6 +9,10 @@ load_dotenv(BASE_DIR / ".env")
 load_dotenv(BASE_DIR.parent / ".env")
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./rtrwh.db")
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+# Redis is optional: an empty REDIS_URL uses the in-memory fallback
+REDIS_URL = os.getenv("REDIS_URL", "")
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "barkha_ai")
+
+# Comma-separated list of allowed frontend origins, e.g. https://barkha-ai.vercel.app
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
