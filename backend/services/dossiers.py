@@ -16,7 +16,11 @@ def score_options(s, h: Dict[str, Any], storage: Dict[str, Any], recharge: Dict[
     demand = storage["annual_demand"]
     harvestable = h["harvestable_volume"]
     coverage = storage["demand_coverage"]
-    supply_value = min(1.0, coverage / 0.6)                     # covering 60%+ of demand earns full marks
+    # Storage is worth most when the stored water actually gets used. A building
+    # whose demand dwarfs its roof yield uses every litre, so judge storage by
+    # utilisation of the harvest first and by share of demand covered second.
+    utilisation = storage["annual_supply"] / harvestable if harvestable > 0 else 0.0
+    supply_value = 0.7 * min(1.0, utilisation / 0.7) + 0.3 * min(1.0, coverage / 0.5)
     soil_value = min(1.0, recharge["infiltration_rate"] / 15)  # loamy-or-better soils earn full marks
     surplus_share = storage["overflow_to_recharge"] / harvestable if harvestable > 0 else 0.0
     has_demand = demand > 0
@@ -30,8 +34,9 @@ def score_options(s, h: Dict[str, Any], storage: Dict[str, Any], recharge: Dict[
     else:
         storage_score = 10
 
-    # Recharge alone serves no household demand, so it ranks lower where demand exists
-    no_demand_bonus = 25 if not has_demand else -5
+    # Recharge alone supplies no water to the building, so it ranks well below
+    # storage wherever there is daily demand
+    no_demand_bonus = 25 if not has_demand else -20
     pit_score = 15 + 45 * soil_value + (15 if pit["count"] <= 2 else 5) + no_demand_bonus
     trench_fit = s.soil_type in ("clay", "rocky") or s.roof_area > 300
     trench_score = 15 + 40 * soil_value + (15 if trench_fit else 5) + (8 if trench["count"] <= 2 else 2) + no_demand_bonus
@@ -123,6 +128,8 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
     trench = recharge["recharge_trench"]
     tariff = s.water_tariff
     tank = storage["recommended_volume"]
+    # Rainwater put to use each year: all of the harvest, up to what the site needs
+    water_used = min(h["harvestable_volume"], demand)
 
     recommended_id = ctx["recommended_dossier"]
     scores = ctx["scores"]
@@ -177,7 +184,7 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
             "Flush the system with the first rain, then test water quality before potable use.",
         ],
         "financial": _financial(storage_statement),
-        "benefits": _benefits(storage["annual_supply"], 0, tariff),
+        "benefits": _benefits(water_used, 0, tariff),
         "maintenance": [
             "Clean roof, gutters and leaf screens before the monsoon and monthly during it.",
             "Empty and reset the first-flush diverter after every rain event.",
@@ -331,7 +338,7 @@ def build_dossiers(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
             "Commission with the first rain and check both structures drain within 24 hours.",
         ],
         "financial": _financial(hybrid_statement),
-        "benefits": _benefits(storage["annual_supply"], hybrid_recharge, tariff),
+        "benefits": _benefits(water_used, hybrid_recharge, tariff),
         "maintenance": [
             "Follow both storage and recharge maintenance schedules.",
             "Check the overflow link stays clear before every monsoon.",

@@ -308,11 +308,17 @@ class RTRWHCalculator:
             recharge=recharge,
             prefer_trench=decision["recharge_kind"] == "trench",
         )
-        annual_savings = supplied * s.water_tariff
+        # Savings count all the rainwater the site can put to use: the whole
+        # harvest, up to its annual demand. A site that uses more water than
+        # its roof collects uses every litre, so savings never drop to zero
+        # just because demand is large.
+        annual_demand = s.water_demand * 365 / 1000
+        water_used = min(harvestable, annual_demand) if (uses_storage or annual_demand > 0) and recommendation != "not_feasible" else 0.0
+        annual_savings = water_used * s.water_tariff
         total = statement["total_cost"]
         payback_years = total / annual_savings if annual_savings > 0 else None
 
-        subsidies = find_subsidies(s.state, total, s.water_tariff, supplied)
+        subsidies = find_subsidies(s.state, total, s.water_tariff, water_used)
 
         storage_req = {
             "required_volume": storage["required_volume"],
@@ -345,7 +351,7 @@ class RTRWHCalculator:
             "recharge_recommendation": recharge,
             "cost_analysis": statement["legacy_cost_analysis"],
             "savings_analysis": {
-                "annual_water_saved": round(supplied, 2),
+                "annual_water_saved": round(water_used, 2),
                 "annual_recharge": round(recharged, 2),
                 "annual_cost_savings": round(annual_savings, 2),
                 "monthly_savings": round(annual_savings / 12, 2),
