@@ -476,6 +476,8 @@ export const en = {
   "rec.upkeep": "Upkeep",
   "rec.others": "Other options we checked",
   "rec.notFeasible": "Your roof collects too little rain for a system to be worth building.",
+  "highlight.beforeSubsidy": "{years} without the subsidy",
+  "highlight.paybackTipSubsidy": "Cost after your chosen subsidy, divided by the money you save each year.",
 } as const;
 
 export type TranslationKey = keyof typeof en;

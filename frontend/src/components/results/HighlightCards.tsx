@@ -45,7 +45,15 @@ const Card = ({
       <InfoTip className="text-white/80 hover:bg-white/20 hover:text-white">{tip}</InfoTip>
     </div>
     <p className="relative mt-4 text-sm font-medium text-white/85">{label}</p>
-    <p className="relative text-3xl font-extrabold tracking-tight tabular-nums">{value}</p>
+    <motion.p
+      key={value}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 24 }}
+      className="relative text-3xl font-extrabold tracking-tight tabular-nums"
+    >
+      {value}
+    </motion.p>
     <p className="relative mt-1 text-sm text-white/85">{sub}</p>
   </motion.div>
 );
@@ -62,6 +70,8 @@ export const HighlightCards = ({
 }: HighlightCardsProps) => {
   const { t, locale } = useLanguage();
   const litres = Math.round(harvestM3 * 1000).toLocaleString(locale);
+  const subsidised = paybackYears !== null && paybackAfterSubsidy !== null && paybackAfterSubsidy < paybackYears;
+  const effectivePayback = subsidised ? paybackAfterSubsidy : paybackYears;
   const years = (value: number) => (value < 1 ? t("highlight.underAYear") : t("result.years", { count: value.toFixed(1) }));
 
   return (
@@ -89,15 +99,16 @@ export const HighlightCards = ({
         gradient="bg-gradient-to-br from-cyan-500 via-teal-500 to-emerald-700"
         icon={<CalendarClock className="h-6 w-6" />}
         label={t("highlight.payback")}
-        value={paybackYears === null ? t("highlight.notApplicable") : years(paybackYears)}
+        // The headline uses the cost after the selected subsidy, so it updates as soon as one is chosen
+        value={effectivePayback === null ? t("highlight.notApplicable") : years(effectivePayback)}
         sub={
           paybackYears === null
             ? t("highlight.noSavings")
-            : paybackAfterSubsidy !== null && paybackAfterSubsidy < paybackYears
-              ? t("highlight.afterSubsidy", { years: years(paybackAfterSubsidy) })
+            : subsidised
+              ? t("highlight.beforeSubsidy", { years: years(paybackYears) })
               : t("highlight.paybackSub")
         }
-        tip={t("highlight.paybackTip")}
+        tip={t(subsidised ? "highlight.paybackTipSubsidy" : "highlight.paybackTip")}
       />
     </motion.div>
   );
