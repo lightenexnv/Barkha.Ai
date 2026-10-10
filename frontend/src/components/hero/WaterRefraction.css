@@ -1,0 +1,132 @@
+/* Thin band where light catches the water surface. */
+.water-refraction__surface {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--waterline) - 5px);
+  left: 0;
+  width: 100%;
+  height: 11px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.water-refraction__surface::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: -50%;
+  width: 200%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 15%,
+    rgba(255, 255, 255, 0.85) 35%,
+    rgba(255, 255, 255, 0.35) 55%,
+    rgba(255, 255, 255, 0.75) 72%,
+    transparent 100%
+  );
+  animation: water-surface-flow 6s linear infinite alternate;
+}
+
+.water-refraction__surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.12),
+    rgba(255, 255, 255, 0.04),
+    transparent
+  );
+}
+
+.water-refraction__glint {
+  position: absolute;
+  top: 4px;
+  left: -25%;
+  width: 15%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.85);
+  filter: blur(0.5px);
+  animation: water-glint-flow 4s ease-in-out infinite;
+}
+
+@keyframes water-surface-flow {
+  from {
+    transform: translateX(-12%);
+  }
+  to {
+    transform: translateX(12%);
+  }
+}
+
+@keyframes water-glint-flow {
+  0% {
+    left: -25%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  70% {
+    opacity: 0.5;
+  }
+  100% {
+    left: 110%;
+    opacity: 0;
+  }
+}
+
+/* Labels pinned to parts of the 3D model. */
+.hero-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 18px -8px rgba(11, 37, 64, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  white-space: nowrap;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 11.5px;
+  line-height: 1;
+  color: #0b2540;
+  user-select: none;
+}
+
+.hero-label__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9);
+}
+
+.hero-label__title {
+  font-weight: 600;
+}
+
+.hero-label__detail {
+  font-weight: 500;
+  color: #1d7fb0;
+  padding-left: 6px;
+  border-left: 1px solid rgba(11, 37, 64, 0.15);
+}
+
+@media (max-width: 640px) {
+  .hero-label {
+    font-size: 10px;
+    padding: 4px 8px 4px 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .water-refraction__surface::before,
+  .water-refraction__glint {
+    animation: none;
+  }
+}

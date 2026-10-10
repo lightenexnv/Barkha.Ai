@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { MapPin, Home, Droplets, Gauge, Loader2 } from "lucide-react";
+import { MapPin, Droplets, Loader2 } from "lucide-react";
+import { Icon3D } from "@/components/Icon3D";
 import { useToast } from "@/hooks/use-toast";
 import { api, SiteDetailsInput, ROOF_MATERIALS, ROOF_CONDITIONS, SOIL_TYPES } from "@/lib/api";
 
@@ -119,7 +120,7 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
       <Card className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Droplets className="h-6 w-6 text-primary" />
+            <Icon3D name="drop" className="h-7 w-7" />
             <span>Rainwater Harvesting Assessment</span>
           </CardTitle>
           <CardDescription>
@@ -133,7 +134,7 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
               {/* Site Information */}
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 text-lg font-semibold">
-                  <Home className="h-5 w-5 text-accent" />
+                  <Icon3D name="house" className="h-6 w-6" />
                   <span>Site Information</span>
                 </div>
 
@@ -208,7 +209,7 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
               {/* Roof Details */}
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 text-lg font-semibold">
-                  <Home className="h-5 w-5 text-accent" />
+                  <Icon3D name="roof" className="h-6 w-6" />
                   <span>Roof Details</span>
                 </div>
 
@@ -288,7 +289,7 @@ export const AssessmentForm = ({ onSuccess }: AssessmentFormProps) => {
               {/* Site Conditions */}
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 text-lg font-semibold">
-                  <Gauge className="h-5 w-5 text-accent" />
+                  <Icon3D name="gauge" className="h-6 w-6" />
                   <span>Site Conditions</span>
                 </div>
 

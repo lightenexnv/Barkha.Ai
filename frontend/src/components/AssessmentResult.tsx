@@ -3,19 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Droplets, 
-  TrendingUp, 
-  AlertTriangle, 
-  Download, 
-  RotateCcw,
-  Home,
-  Calculator,
-  FileText,
-  CheckCircle,
-  XCircle,
-  AlertCircle
-} from "lucide-react";
+import { Download, RotateCcw } from "lucide-react";
+import { Icon3D, type Icon3DName } from "@/components/Icon3D";
 import { AssessmentResult as AssessmentResultType, formatCurrency, formatVolume, RECOMMENDATION_LABELS } from "@/lib/api";
 import axios from "axios";
 import { toast } from "@/components/ui/use-toast"; // Assuming Shadcn/UI toast component
@@ -41,17 +30,17 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
     }
   };
 
-  const getRecommendationIcon = (recommendation: string) => {
+  const getRecommendationIcon = (recommendation: string): Icon3DName => {
     switch (recommendation) {
       case 'hybrid':
       case 'storage_priority_hybrid':
       case 'storage_only':
       case 'recharge_only':
-        return CheckCircle;
+        return "checkMark";
       case 'not_feasible':
-        return XCircle;
+        return "xMark";
       default:
-        return AlertCircle;
+        return "warningSign";
     }
   };
 
@@ -85,7 +74,7 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
     }
   };
 
-  const RecommendationIcon = getRecommendationIcon(result.recommended_option);
+  const recommendationIcon = getRecommendationIcon(result.recommended_option);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -118,7 +107,7 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
           <CardContent className="p-6">
             <div className="flex items-center space-x-3">
               <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Droplets className="h-6 w-6 text-primary" />
+                <Icon3D name="drop" className="h-9 w-9" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Harvestable Volume</p>
@@ -133,7 +122,7 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
           <CardContent className="p-6">
             <div className="flex items-center space-x-3">
               <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-accent" />
+                <Icon3D name="coins" className="h-9 w-9" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Annual Savings</p>
@@ -148,7 +137,7 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
           <CardContent className="p-6">
             <div className="flex items-center space-x-3">
               <div className="h-12 w-12 rounded-lg bg-warning/10 flex items-center justify-center">
-                <Calculator className="h-6 w-6 text-warning" />
+                <Icon3D name="calculator" className="h-9 w-9" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Implementation Cost</p>
@@ -164,7 +153,7 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
       <Card className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <RecommendationIcon className="h-6 w-6 text-primary" />
+            <Icon3D name={recommendationIcon} className="h-7 w-7" />
             <span>Recommendation</span>
           </CardTitle>
         </CardHeader>
@@ -198,7 +187,7 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
             <Card className="glass-card">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Home className="h-5 w-5 text-primary" />
+                  <Icon3D name="waterTank" className="h-6 w-6" />
                   <span>Storage System</span>
                 </CardTitle>
               </CardHeader>
@@ -224,7 +213,7 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
             <Card className="glass-card">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Droplets className="h-5 w-5 text-accent" />
+                  <Icon3D name="drop" className="h-6 w-6" />
                   <span>Recharge System</span>
                 </CardTitle>
               </CardHeader>
@@ -295,7 +284,7 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <FileText className="h-5 w-5 text-primary" />
+                <Icon3D name="document" className="h-6 w-6" />
                 <span>Bill of Quantities</span>
               </CardTitle>
               <CardDescription>Detailed material and labor requirements</CardDescription>
@@ -335,7 +324,7 @@ export const AssessmentResult = ({ result, onNewAssessment }: AssessmentResultPr
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <AlertTriangle className="h-5 w-5 text-warning" />
+                <Icon3D name="warningSign" className="h-6 w-6" />
                 <span>Safety & Compliance</span>
               </CardTitle>
               <CardDescription>Important considerations and requirements</CardDescription>

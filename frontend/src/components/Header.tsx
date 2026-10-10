@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Droplets, BarChart3, Settings, Satellite } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { Icon3D, type Icon3DName } from "@/components/Icon3D";
 
 export const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
 
-  const navigation = [
-    { name: "Dashboard", href: "/", icon: BarChart3 },
-    { name: "New Assessment", href: "/assess", icon: Droplets },
-    { name: "Satellite Analysis", href: "/satellite", icon: Satellite },
-    { name: "Settings", href: "/settings", icon: Settings },
+  const navigation: { name: string; href: string; icon: Icon3DName }[] = [
+    { name: "Dashboard", href: "/", icon: "barChart" },
+    { name: "New Assessment", href: "/assess", icon: "drop" },
+    { name: "Satellite Analysis", href: "/satellite", icon: "satellite" },
+    { name: "Settings", href: "/settings", icon: "gear" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -23,7 +24,7 @@ export const Header = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
             <div className="relative">
-              <Droplets className="h-8 w-8 text-primary animate-float" />
+              <Icon3D name="logoDrops" className="h-9 w-9 animate-float" />
               <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
             </div>
             <div className="flex flex-col">
@@ -35,7 +36,6 @@ export const Header = () => {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-1">
             {navigation.map((item) => {
-              const Icon = item.icon;
               return (
                 <Link
                   key={item.name}
@@ -46,7 +46,7 @@ export const Header = () => {
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon3D name={item.icon} className="h-5 w-5" />
                   <span>{item.name}</span>
                 </Link>
               );
@@ -74,7 +74,6 @@ export const Header = () => {
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 bg-card/50 backdrop-blur-sm rounded-lg mt-2 border border-border/40">
               {navigation.map((item) => {
-                const Icon = item.icon;
                 return (
                   <Link
                     key={item.name}
@@ -86,7 +85,7 @@ export const Header = () => {
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     }`}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon3D name={item.icon} className="h-6 w-6" />
                     <span>{item.name}</span>
                   </Link>
                 );
