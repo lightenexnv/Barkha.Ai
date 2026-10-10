@@ -18,6 +18,7 @@ Thumbs.db
 # Documentation & Prompt Artifacts
 context.md
 prompt.md
+app_prompt.md
 
 # TypeScript build caches
 *.tsbuildinfo
