@@ -201,6 +201,9 @@ def find_subsidies(state: Optional[str], total_cost: float, water_tariff: float,
         if auto_apply and grant > best_grant:
             best_grant, best_scheme = grant, scheme["id"]
 
+    # Highest indicative help first; ties keep state before local before central
+    schemes.sort(key=lambda s: -s.get("indicative_grant", 0))
+
     return {
         "state": state or "",
         "state_code": code,

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, ChevronDown, CloudRain, LogIn, MapPin, RotateCcw, Ruler, Save, ShieldAlert } from "lucide-react";
+import { CheckCircle2, ChevronDown, CloudRain, LogIn, MapPin, RotateCcw, Ruler, Save, Share2, ShieldAlert } from "lucide-react";
+import { shareMessage, whatsappUrl } from "@/lib/share";
 import { Button } from "@/components/ui/button";
 import { DrawnIcon } from "@/components/DrawnIcon";
 import { InfoTip } from "@/components/InfoTip";
@@ -164,6 +165,16 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
             </Button>
           </Pressable>
           <ReportDownloadMenu data={{ site: input, result }} />
+          <Pressable>
+            <Button
+              variant="outline"
+              className="border-[#25D366] bg-[#25D366] text-white hover:bg-[#1ebe5a] hover:text-white"
+              onClick={() => window.open(whatsappUrl(shareMessage(input, result)), "_blank", "noopener")}
+            >
+              <Share2 className="me-2 h-4 w-4" />
+              {t("share.whatsapp")}
+            </Button>
+          </Pressable>
         </div>
       </motion.div>
 
@@ -255,7 +266,7 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
 
       {/* 4. Help with the cost */}
       {result.subsidies && (
-        <SubsidyPanel subsidies={result.subsidies} grossCost={totalCost} selection={subsidy} onSelect={setSubsidy} />
+        <SubsidyPanel subsidies={result.subsidies} grossCost={totalCost} selection={subsidy} onSelect={setSubsidy} input={input} result={result} />
       )}
 
       <GoodToKnow checks={result.safety_checks} />

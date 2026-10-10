@@ -305,4 +305,8 @@ export const hi: Translations = {
   "replay.collected": "अब तक जमा बारिश",
   "replay.used": "घर में इस्तेमाल",
   "replay.recharged": "ज़मीन में भेजा गया",
+  "share.whatsapp": "WhatsApp पर भेजें",
+  "apply.button": "आवेदन भरें",
+  "apply.title": "सब्सिडी आवेदन पत्र",
+  "apply.download": "भरा हुआ फ़ॉर्म डाउनलोड करें (PDF)",
 };

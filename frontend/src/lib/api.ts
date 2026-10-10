@@ -324,6 +324,24 @@ class BarkhaAPI {
     );
   }
 
+  /** A pre-filled, ready-to-print subsidy application for one scheme. */
+  async subsidyApplication(
+    site: Partial<SiteDetailsInput>,
+    result: Partial<AssessmentResult>,
+    schemeId: string,
+    applicant: { name?: string; phone?: string; email?: string; address?: string },
+  ): Promise<DownloadedFile> {
+    return this.fetchFile(
+      `${API_BASE_URL}/api/subsidy-application`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/pdf' },
+        body: JSON.stringify({ site, result, scheme_id: schemeId, applicant }),
+      },
+      `Subsidy_Application_${schemeId}.pdf`,
+    );
+  }
+
   /** Have the server build a report from data the client already holds. */
   async downloadReportDirect(
     site: Partial<SiteDetailsInput>,

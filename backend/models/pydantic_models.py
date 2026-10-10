@@ -77,6 +77,14 @@ class RoofDetectionRequest(BaseModel):
         return v
 
 
+class SubsidyApplicationRequest(BaseModel):
+    """Assessment data plus the chosen scheme and the applicant's details."""
+    site: Dict[str, Any]
+    result: Dict[str, Any]
+    scheme_id: str
+    applicant: Dict[str, Any] = {}
+
+
 class DirectReportRequest(BaseModel):
     """Assessment data sent by the client when the server has no stored record."""
     site: Dict[str, Any]

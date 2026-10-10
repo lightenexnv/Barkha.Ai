@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ExternalLink, Landmark } from "lucide-react";
+import { ChevronDown, ExternalLink, FileText, Landmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InfoTip } from "@/components/InfoTip";
 import { fadeUp } from "@/components/motion/presets";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatCurrency, type SubsidyScheme, type SubsidySummary } from "@/lib/api";
+import { formatCurrency, type AssessmentResult, type SiteDetailsInput, type SubsidyScheme, type SubsidySummary } from "@/lib/api";
+import { ApplicationDialog } from "./ApplicationDialog";
 import { cn } from "@/lib/utils";
 import { subsidyAmount, type SubsidySelection } from "./subsidy";
 
@@ -44,7 +46,7 @@ const Radio = ({ checked }: { checked: boolean }) => (
   </span>
 );
 
-const SchemeRow = ({ scheme, checked, onSelect }: { scheme: SubsidyScheme; checked: boolean; onSelect: () => void }) => {
+const SchemeRow = ({ scheme, checked, onSelect, onApply }: { scheme: SubsidyScheme; checked: boolean; onSelect: () => void; onApply: () => void }) => {
   const { t } = useLanguage();
   const [details, setDetails] = useState(false);
   const levelKey = scheme.level === "Central" ? "subsidy.central" : scheme.level === "State" ? "subsidy.state" : "subsidy.local";
@@ -66,6 +68,10 @@ const SchemeRow = ({ scheme, checked, onSelect }: { scheme: SubsidyScheme; check
             </span>
           </span>
         </button>
+        <Button type="button" size="sm" variant="outline" onClick={onApply} className="shrink-0 border-primary/40 text-primary">
+          <FileText className="h-4 w-4 sm:me-1.5" />
+          <span className="hidden sm:inline">{t("apply.button")}</span>
+        </Button>
         <button
           type="button"
           onClick={() => setDetails((open) => !open)}
@@ -107,14 +113,21 @@ export const SubsidyPanel = ({
   grossCost,
   selection,
   onSelect,
+  input,
+  result,
 }: {
   subsidies: SubsidySummary;
   grossCost: number;
   selection: SubsidySelection;
   onSelect: (selection: SubsidySelection) => void;
+  input: SiteDetailsInput;
+  result: AssessmentResult;
 }) => {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
+  const [applyFor, setApplyFor] = useState<SubsidyScheme | null>(null);
+  // Highest help first (older saved results may not be sorted)
+  const schemes = [...subsidies.schemes].sort((a, b) => b.indicative_grant - a.indicative_grant);
   const applied = subsidyAmount(selection, subsidies, grossCost);
   const customAmount = selection.kind === "custom" ? selection.amount : 0;
 
@@ -166,7 +179,7 @@ export const SubsidyPanel = ({
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-2 border-t border-border/60 px-5 py-3 text-sm font-medium text-primary hover:bg-primary/5 sm:px-6"
       >
-        <span>{open ? t("subsidy.hide") : t("subsidy.show", { count: subsidies.schemes.length })}</span>
+        <span>{open ? t("subsidy.hide") : t("subsidy.show", { count: schemes.length })}</span>
         <motion.span animate={{ rotate: open ? 180 : 0 }} className="flex">
           <ChevronDown className="h-4 w-4" />
         </motion.span>
@@ -188,12 +201,13 @@ export const SubsidyPanel = ({
             {t("subsidy.none")}
           </button>
           <ul className="space-y-2">
-            {subsidies.schemes.map((scheme) => (
+            {schemes.map((scheme) => (
               <SchemeRow
                 key={scheme.id}
                 scheme={scheme}
                 checked={selection.kind === "scheme" && selection.id === scheme.id}
                 onSelect={() => onSelect({ kind: "scheme", id: scheme.id })}
+                onApply={() => setApplyFor(scheme)}
               />
             ))}
           </ul>
@@ -226,6 +240,7 @@ export const SubsidyPanel = ({
           <p className="text-xs text-muted-foreground">{t("subsidy.projection")}</p>
         </div>
       </Collapse>
+      <ApplicationDialog scheme={applyFor} input={input} result={result} onClose={() => setApplyFor(null)} />
     </motion.section>
   );
 };

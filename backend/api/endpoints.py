@@ -13,7 +13,8 @@ import logging
 from core.database import redis_client, mongo_db
 from core.dependencies import get_db
 from models.db_models import Assessment, LocalConfig
-from models.pydantic_models import SiteDetailsInput, AssessmentResult, ConfigData, DirectReportRequest, RoofDetectionRequest
+from models.pydantic_models import SiteDetailsInput, AssessmentResult, ConfigData, DirectReportRequest, RoofDetectionRequest, SubsidyApplicationRequest
+from services.application_generator import generate_application_pdf
 from services.calculator import RTRWHCalculator
 from services.pdf_generator import generate_assessment_pdf
 from services.text_generator import generate_assessment_text
@@ -248,6 +249,33 @@ async def generate_report_direct(request: DirectReportRequest):
     """
     assessment = build_assessment(request.site, request.result, assessment_id=request.result.get("assessment_id"))
     return await serve_report(assessment, request.format)
+
+
+@router.post("/subsidy-application")
+async def subsidy_application(request: SubsidyApplicationRequest):
+    """A pre-filled, ready-to-print application for one subsidy scheme."""
+    try:
+        files = await run_in_threadpool(generate_application_pdf, request.site, request.result, request.scheme_id, request.applicant)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Subsidy application failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="The application form could not be prepared.")
+
+    async def cleanup():
+        for name in files:
+            try:
+                Path(name).unlink(missing_ok=True)
+            except Exception as error:
+                logger.warning(f"Could not delete {name}: {error}")
+
+    scheme = "".join(c for c in request.scheme_id if c.isalnum() or c in "-_")
+    filename = f"Subsidy_Application_{scheme}.pdf"
+    return FileResponse(
+        files[0], media_type="application/pdf", filename=filename,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"},
+        background=cleanup,
+    )
 
 
 @router.post("/upload-photos/{assessment_id}")
