@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import AssessmentPage from "./pages/AssessmentPage";
 import SettingsPage from "./pages/SettingsPage";
 import { SaralAssistant } from "@/components/saral/SaralAssistant";
+import { RainAlertWatcher } from "@/components/RainAlertWatcher";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
               <AuthModal />
               <BrowserRouter>
                 <SaralAssistant />
+                <RainAlertWatcher />
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/assess" element={<AssessmentPage />} />

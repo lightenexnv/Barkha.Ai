@@ -10,6 +10,7 @@ import { Pressable } from "@/components/motion/Motion";
 import { fadeUp } from "@/components/motion/presets";
 import { FinancialStatement } from "@/components/results/FinancialStatement";
 import { HighlightCards } from "@/components/results/HighlightCards";
+import { MonsoonLive } from "@/components/results/MonsoonLive";
 import { RecommendationSection } from "@/components/results/RecommendationSection";
 import { SubsidyPanel } from "@/components/results/SubsidyPanel";
 import { defaultSelection, subsidyAmount, type SubsidySelection } from "@/components/results/subsidy";
@@ -234,6 +235,9 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
           </div>
         </div>
       </div>
+
+      {/* This week's rain on this roof */}
+      <MonsoonLive input={input} result={result} />
 
       {/* 3. What it costs */}
       {result.financial_statement ? (
