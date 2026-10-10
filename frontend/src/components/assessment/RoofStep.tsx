@@ -9,6 +9,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useUnits } from "@/context/SettingsContext";
 import { api, ApiError } from "@/lib/api";
 import { polygonAreaM2, type LatLon } from "@/lib/geo";
+import { useSlowFlag } from "@/hooks/useSlowFlag";
 import { EMPTY_ROOF, MAX_ROOF_M2, type RoofState } from "./model";
 import { SatelliteMap, type MapFocus } from "./SatelliteMap";
 
@@ -113,6 +114,7 @@ export const RoofStep = ({ location, roof, onChange, onBack, onConfirm }: RoofSt
   };
 
   const detecting = detection.status === "detecting";
+  const slowDetection = useSlowFlag(detecting);
   const areaValid = roof.area >= 1 && roof.area <= MAX_ROOF_M2;
   const lowConfidence = roof.method === "detected" && roof.confidence !== null && roof.confidence < 0.5;
 
@@ -146,7 +148,7 @@ export const RoofStep = ({ location, roof, onChange, onBack, onConfirm }: RoofSt
               {detecting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("roof.detecting")}
+                  {slowDetection ? t("wizard.serverWaking") : t("roof.detecting")}
                 </>
               ) : roof.polygon ? (
                 <>

@@ -9,7 +9,8 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useToast } from "@/hooks/use-toast";
 import { useLocationClimate } from "@/hooks/useLocationClimate";
-import { api, type AssessmentResult as AssessmentResultType, type SiteDetailsInput } from "@/lib/api";
+import { api, wakeBackend, type AssessmentResult as AssessmentResultType, type SiteDetailsInput } from "@/lib/api";
+import { useSlowFlag } from "@/hooks/useSlowFlag";
 import { isValidCoordinate } from "@/lib/climate";
 import { centroid, distanceM, type LatLon } from "@/lib/geo";
 import { buildAssessmentEntry, deleteAssessment, saveAssessment } from "@/lib/historyService";
@@ -58,6 +59,11 @@ export const AssessmentWizard = ({ seed }: { seed?: WizardSeed }) => {
     water_demand: 540,
   });
   const climate = useLocationClimate(location[0], location[1]);
+
+  // Wake the (sleeping, free-tier) API while the user is still choosing a location
+  useEffect(() => {
+    void wakeBackend();
+  }, []);
 
   const [result, setResult] = useState<{ result: AssessmentResultType; input: SiteDetailsInput } | null>(null);
   const [computation, setComputation] = useState<Computation>({ status: "idle" });
@@ -188,6 +194,7 @@ export const AssessmentWizard = ({ seed }: { seed?: WizardSeed }) => {
   }));
 
   const stale = result !== null && signature !== lastSignature.current;
+  const slowCalculation = useSlowFlag(computation.status === "running");
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -274,6 +281,7 @@ export const AssessmentWizard = ({ seed }: { seed?: WizardSeed }) => {
                 <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border text-muted-foreground">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <p>{t("form.submitting")}</p>
+                  {slowCalculation && <p className="max-w-sm text-center text-sm">{t("wizard.serverWaking")}</p>}
                 </div>
               )
             )}

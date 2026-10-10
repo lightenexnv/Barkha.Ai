@@ -1,10 +1,28 @@
 // API Configuration and Types for Barkha.AI
 
-// Production builds default to the Render backend so a missing env var can't break the site
+// Production builds default to the Render backend so a missing env var can't break the site.
+// In development requests stay same-origin ("/api/...") and the Vite proxy forwards them
+// to a local backend if one is running, or to the deployed one (see vite.config.ts).
 export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.PROD ? "https://barkha-ai-backend.onrender.com" : "http://localhost:8000")
+  (import.meta.env.PROD ? "https://barkha-ai-backend.onrender.com" : "")
 ).replace(/\/+$/, "");
+
+/**
+ * The free-tier backend sleeps when idle and needs up to a minute to wake.
+ * Ping it as soon as the user starts an assessment so it is awake by the time
+ * roof detection or the calculation is requested.
+ */
+let warmUp: Promise<boolean> | null = null;
+export const wakeBackend = (): Promise<boolean> => {
+  warmUp ??= fetch(`${API_BASE_URL}/health`, { cache: "no-store" })
+    .then((response) => response.ok)
+    .catch(() => {
+      warmUp = null; // allow a later retry
+      return false;
+    });
+  return warmUp;
+};
 
 // Types matching the backend models
 export interface SiteDetailsInput {

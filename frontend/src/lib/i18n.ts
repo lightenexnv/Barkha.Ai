@@ -290,6 +290,7 @@ export const en = {
   "wizard.fineTuneHint": "Change any choice and the results update instantly",
   "wizard.adjust": "Adjust",
   "wizard.hide": "Hide",
+  "wizard.serverWaking": "The server is waking up after being idle; this can take up to a minute the first time…",
 
   // Location step
   "location.title": "Where is the building?",
