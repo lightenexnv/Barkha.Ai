@@ -2,13 +2,15 @@
 // Powered by TinyFish AI Crawler to scrape, rank, and connect nearby sanitary shops, STP suppliers, and labor.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { reverseGeocode } from "@/lib/climate";
+import { enquiryMaterials, materialSheetFile, sendEnquiry, type EnquiryPlan } from "@/lib/enquiry";
+import { saveBlob } from "@/lib/storage";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  CalendarCheck,
-  CheckCircle2,
   Crosshair,
   ExternalLink,
+  FileText,
   Filter,
+  PackageSearch,
   Hammer,
   HardHat,
   Loader2,
@@ -43,8 +45,39 @@ const UPKEEP = [
   { when: "Annual service", text: "Dewater and clean storage tank silt; replenish sand and gravel media in recharge pit." },
 ];
 
-export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => {
+export const MaintenanceDrawer = ({
+  open,
+  onOpenChange,
+  enquiry,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** When given, the drawer becomes a material enquiry for this plan */
+  enquiry?: EnquiryPlan;
+}) => {
   const { toast } = useToast();
+  const [sending, setSending] = useState<string | null>(null);
+  const materials = enquiry ? enquiryMaterials(enquiry.result) : [];
+
+  /** Open WhatsApp with this plan's material list, to a shop or a chat the user picks. */
+  const sendMaterialEnquiry = (shop?: Vendor) => {
+    if (!enquiry) return;
+    sendEnquiry(enquiry, shop ? { name: shop.name, whatsapp: shop.whatsapp || shop.phone } : undefined);
+    toast({ title: "Enquiry ready in WhatsApp", description: "The message lists every material with its quantity. Review it and press send." });
+  };
+
+  const downloadSheet = async () => {
+    if (!enquiry) return;
+    setSending("download");
+    try {
+      const file = await materialSheetFile(enquiry);
+      saveBlob(file, file.name);
+    } catch {
+      toast({ title: "Could not prepare the material sheet", variant: "destructive" });
+    } finally {
+      setSending(null);
+    }
+  };
   const [activeTab, setActiveTab] = useState<"vendors" | "workflow">("vendors");
   // Filled from the user's current location when the drawer opens; always editable
   const [searchLocation, setSearchLocation] = useState("");
@@ -54,7 +87,6 @@ export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpe
   const [vendors, setVendors] = useState<Vendor[]>(CURATED_VENDORS);
   const [isSearching, setIsSearching] = useState(false);
   const [filterCategory, setFilterCategory] = useState<"all" | "sanitary" | "stp" | "labor" | "testing">("all");
-  const [booked, setBooked] = useState(false);
 
   // Live scrape & search using TinyFish API
   const searchVendors = useCallback(async (place: string, quiet = false) => {
@@ -115,11 +147,32 @@ export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpe
   );
 
   useEffect(() => {
-    if (open && !detectedOnce.current) {
+    if (!open) return;
+    if (enquiry) {
+      // Enquiries search near the assessed site, not where the phone is
+      setFilterCategory("sanitary");
+      setActiveTab("vendors");
+      const { latitude, longitude, city, district } = enquiry.input;
+      const fallback = city || district || "";
+      reverseGeocode(latitude, longitude)
+        .then((place) => [place.locality, place.city || place.district].filter((part, i, all) => part && all.indexOf(part) === i).join(", "))
+        .catch(() => fallback)
+        .then((label) => {
+          const where = label || fallback;
+          if (where && !editedByUser.current) {
+            setSearchLocation(where);
+            void searchVendors(where, true);
+          }
+        });
+      return;
+    }
+    if (!detectedOnce.current) {
       detectedOnce.current = true;
       detectLocation();
     }
-  }, [open, detectLocation]);
+    // Re-run per open and per plan location only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, enquiry?.input.latitude, enquiry?.input.longitude, detectLocation]);
 
   const filteredVendors = vendors.filter((v) => {
     if (filterCategory === "all") return true;
@@ -144,9 +197,9 @@ export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpe
           <div className="flex items-center justify-between">
             <SheetTitle className="flex items-center gap-2.5 text-2xl font-bold">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Wrench className="h-5 w-5" />
+                {enquiry ? <PackageSearch className="h-5 w-5" /> : <Wrench className="h-5 w-5" />}
               </span>
-              Maintenance & Installation
+              {enquiry ? "Enquire for materials" : "Maintenance & Installation"}
             </SheetTitle>
             <span className="flex items-center gap-1.5 rounded-full bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-700 dark:text-cyan-300 border border-cyan-500/20">
               <Sparkles className="h-3 w-3" />
@@ -154,7 +207,9 @@ export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpe
             </span>
           </div>
           <SheetDescription className="text-sm text-muted-foreground mt-1">
-            Connect with top-rated sanitary shops for environmental & STP testing equipment, and verified installation labor ranked by Google Map ratings.
+            {enquiry
+              ? "Send your material list to nearby sanitary shops and get quotations. The list has quantities only, no prices."
+              : "Connect with top-rated sanitary shops for environmental & STP testing equipment, and verified installation labor ranked by Google Map ratings."}
           </SheetDescription>
         </SheetHeader>
 
@@ -172,6 +227,34 @@ export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpe
 
             {/* TAB 1: Live Vendors & Labor directory */}
             <TabsContent value="vendors" className="mt-5 space-y-5">
+              {enquiry && materials.length > 0 && (
+                <div className="space-y-3 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="flex items-center gap-2 font-semibold">
+                      <FileText className="h-4 w-4 text-primary" />
+                      Material requirement sheet · {materials.length} items
+                    </p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={downloadSheet} disabled={sending !== null}>
+                        {sending === "download" ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileText className="mr-1.5 h-3.5 w-3.5" />}
+                        Download PDF
+                      </Button>
+                      <Button size="sm" className="bg-[#25D366] text-white hover:bg-[#1ebe5a]" onClick={() => sendMaterialEnquiry()}>
+                        <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
+                        Share on WhatsApp
+                      </Button>
+                    </div>
+                  </div>
+                  <ul className="grid gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
+                    {materials.map((m) => (
+                      <li key={m.item} className="flex justify-between gap-2 border-b border-border/40 py-1">
+                        <span className="truncate">{m.item}</span>
+                        <span className="shrink-0 font-medium text-foreground">{m.quantity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {/* Search Bar powered by TinyFish */}
               <form onSubmit={handleTinyFishSearch} className="flex gap-2">
                 <div className="relative flex-1">
@@ -313,17 +396,29 @@ export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpe
                             Call ({vendor.phone})
                           </a>
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          asChild
-                          className="h-9 px-3 text-xs font-semibold border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
-                        >
-                          <a href={getWhatsAppLink(vendor)} target="_blank" rel="noopener noreferrer">
+                        {enquiry ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => sendMaterialEnquiry(vendor)}
+                            className="h-9 px-3 text-xs font-semibold border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                          >
                             <MessageCircle className="mr-1.5 h-3.5 w-3.5 text-emerald-500" />
-                            WhatsApp Inquiry
-                          </a>
-                        </Button>
+                            Send material enquiry
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            asChild
+                            className="h-9 px-3 text-xs font-semibold border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                          >
+                            <a href={getWhatsAppLink(vendor)} target="_blank" rel="noopener noreferrer">
+                              <MessageCircle className="mr-1.5 h-3.5 w-3.5 text-emerald-500" />
+                              WhatsApp Inquiry
+                            </a>
+                          </Button>
+                        )}
                         <Button size="sm" variant="ghost" asChild className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground">
                           <a href={vendor.googleMapsUrl} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="mr-1 h-3.5 w-3.5" />
@@ -371,46 +466,6 @@ export const MaintenanceDrawer = ({ open, onOpenChange }: { open: boolean; onOpe
                   ))}
                 </ul>
               </section>
-
-              {/* Service booking card */}
-              <div className="rounded-2xl border border-primary/20 bg-primary/10 p-5">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-                    <CalendarCheck className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-base">Book a Certified Inspection & Visit</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Have a verified rainwater engineer and plumbing contractor inspect your site and provide a fixed quote.
-                    </p>
-                  </div>
-                </div>
-
-                <Button
-                  variant="ocean"
-                  className="mt-4 w-full h-10 font-semibold"
-                  onClick={() => {
-                    setBooked(true);
-                    toast({
-                      title: "Service Visit Requested! 🛠️",
-                      description: "Our nearest certified plumbing contractor will call you within 2 business hours.",
-                    });
-                  }}
-                  disabled={booked}
-                >
-                  {booked ? (
-                    <>
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Visit Requested (Engineer Assigned)
-                    </>
-                  ) : (
-                    <>
-                      <CalendarCheck className="mr-2 h-4 w-4" />
-                      Request Installation Visit
-                    </>
-                  )}
-                </Button>
-              </div>
             </TabsContent>
           </Tabs>
         </div>

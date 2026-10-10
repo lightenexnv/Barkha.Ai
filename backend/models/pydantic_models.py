@@ -77,6 +77,12 @@ class RoofDetectionRequest(BaseModel):
         return v
 
 
+class MaterialSheetRequest(BaseModel):
+    """Assessment data for a price-free material requirement sheet."""
+    site: Dict[str, Any]
+    result: Dict[str, Any]
+
+
 class SubsidyApplicationRequest(BaseModel):
     """Assessment data plus the chosen scheme and the applicant's details."""
     site: Dict[str, Any]

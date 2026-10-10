@@ -313,4 +313,5 @@ export const hi: Translations = {
   "flow.collected": "अब तक जमा बारिश",
   "flow.used": "घर में इस्तेमाल",
   "flow.ground": "ज़मीन में भेजा गया",
+  "enquire.button": "सामान की पूछताछ करें",
 };

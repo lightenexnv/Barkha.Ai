@@ -324,6 +324,19 @@ class BarkhaAPI {
     );
   }
 
+  /** Price-free material requirement sheet for the recommended system (to send to shops). */
+  async materialSheet(site: Partial<SiteDetailsInput>, result: Partial<AssessmentResult>): Promise<DownloadedFile> {
+    return this.fetchFile(
+      `${API_BASE_URL}/api/material-sheet`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/pdf' },
+        body: JSON.stringify({ site, result }),
+      },
+      'Material_Requirement_Sheet.pdf',
+    );
+  }
+
   /** A pre-filled, ready-to-print subsidy application for one scheme. */
   async subsidyApplication(
     site: Partial<SiteDetailsInput>,

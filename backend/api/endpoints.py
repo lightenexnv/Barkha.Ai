@@ -13,8 +13,9 @@ import logging
 from core.database import redis_client, mongo_db
 from core.dependencies import get_db
 from models.db_models import Assessment, LocalConfig
-from models.pydantic_models import SiteDetailsInput, AssessmentResult, ConfigData, DirectReportRequest, RoofDetectionRequest, SubsidyApplicationRequest
+from models.pydantic_models import SiteDetailsInput, AssessmentResult, ConfigData, DirectReportRequest, RoofDetectionRequest, SubsidyApplicationRequest, MaterialSheetRequest
 from services.application_generator import generate_application_pdf
+from services.material_sheet import generate_material_sheet
 from services.calculator import RTRWHCalculator
 from services.pdf_generator import generate_assessment_pdf
 from services.text_generator import generate_assessment_text
@@ -249,6 +250,28 @@ async def generate_report_direct(request: DirectReportRequest):
     """
     assessment = build_assessment(request.site, request.result, assessment_id=request.result.get("assessment_id"))
     return await serve_report(assessment, request.format)
+
+
+@router.post("/material-sheet")
+async def material_sheet(request: MaterialSheetRequest):
+    """Price-free list of materials for the recommended system, to send to shops."""
+    try:
+        path = await run_in_threadpool(generate_material_sheet, request.site, request.result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Material sheet failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="The material sheet could not be prepared.")
+
+    async def cleanup():
+        Path(path).unlink(missing_ok=True)
+
+    filename = "Material_Requirement_Sheet.pdf"
+    return FileResponse(
+        path, media_type="application/pdf", filename=filename,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"},
+        background=cleanup,
+    )
 
 
 @router.post("/subsidy-application")

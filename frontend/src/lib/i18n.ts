@@ -540,6 +540,7 @@ export const en = {
   "flow.used": "Used at home",
   "flow.ground": "Sent into the ground",
   "flow.overflow": "Overflow (tank full)",
+  "enquire.button": "Enquire for materials",
 } as const;
 
 export type TranslationKey = keyof typeof en;

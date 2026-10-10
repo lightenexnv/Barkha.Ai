@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, ChevronDown, CloudRain, Hammer, LogIn, MapPin, Ruler, Save, Share2, ShieldAlert, Store, Wrench } from "lucide-react";
+import { CheckCircle2, ChevronDown, PackageSearch, CloudRain, Hammer, LogIn, MapPin, Ruler, Save, Share2, ShieldAlert, Store, Wrench } from "lucide-react";
 import { shareMessage, whatsappUrl } from "@/lib/share";
 import { Button } from "@/components/ui/button";
 import { DrawnIcon } from "@/components/DrawnIcon";
@@ -133,6 +133,7 @@ export const AssessmentResult = ({ result, input }: AssessmentResultProps) => {
     isAssessmentImplemented(result.assessment_id, user?.id),
   );
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const [enquiryOpen, setEnquiryOpen] = useState(false);
 
   useEffect(() => {
     setImplemented(isAssessmentImplemented(result.assessment_id, user?.id));
@@ -156,7 +157,7 @@ export const AssessmentResult = ({ result, input }: AssessmentResultProps) => {
     setAssessmentImplemented(result.assessment_id, next, user?.id);
     if (next) {
       toast({
-        title: "Confirmed as Implemented! 🎉",
+        title: "Marked as implemented",
         description: "Estimated water and savings since installation now show on the home page. These are estimates based on average rainfall.",
       });
     } else {
@@ -206,6 +207,14 @@ export const AssessmentResult = ({ result, input }: AssessmentResultProps) => {
             </Pressable>
           )}
           <ReportDownloadMenu className="shrink-0" data={{ site: input, result }} />
+          {(result.financial_statement?.materials?.length ?? 0) > 0 && (
+            <Pressable className="shrink-0">
+              <Button variant="outline" className="whitespace-nowrap border-primary/40 text-primary" onClick={() => setEnquiryOpen(true)}>
+                <PackageSearch className="me-2 h-4 w-4" />
+                {t("enquire.button")}
+              </Button>
+            </Pressable>
+          )}
           <Pressable className="shrink-0">
             <Button
               variant="outline"
@@ -344,6 +353,7 @@ export const AssessmentResult = ({ result, input }: AssessmentResultProps) => {
 
       {/* Maintenance & Installation Vendor/Labor Drawer */}
       <MaintenanceDrawer open={maintenanceOpen} onOpenChange={setMaintenanceOpen} />
+      <MaintenanceDrawer open={enquiryOpen} onOpenChange={setEnquiryOpen} enquiry={{ input, result }} />
     </div>
   );
 };
