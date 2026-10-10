@@ -534,6 +534,11 @@ export const en = {
   "live.since.hours": "Running for {count} h",
   "live.since.days": "Running for {count} days",
   "live.sinceTip": "Counted from the moment you marked the system as installed ({when}), using the expected rain for each month.",
+  "flow.title": "Live since installation",
+  "flow.collected": "Rain collected so far",
+  "flow.used": "Used at home",
+  "flow.ground": "Sent into the ground",
+  "flow.overflow": "Overflow (tank full)",
 } as const;
 
 export type TranslationKey = keyof typeof en;

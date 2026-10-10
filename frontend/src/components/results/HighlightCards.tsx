@@ -100,6 +100,55 @@ const Card = ({
   </motion.div>
 );
 
+/** Three live counters (collected / used at home / sent into the ground) since installation. */
+const LiveFlow = ({
+  collectedM3,
+  usedM3,
+  groundM3,
+  hasRecharge,
+  sinceLabel,
+}: {
+  collectedM3: number;
+  usedM3: number;
+  groundM3: number;
+  hasRecharge: boolean;
+  sinceLabel: string;
+}) => {
+  const { t, locale } = useLanguage();
+  // One decimal while small, so the counters visibly move in light rain too
+  const litres = (m3: number) => {
+    const value = m3 * 1000;
+    return `${value.toLocaleString(locale, { maximumFractionDigits: value < 1000 ? 1 : 0, minimumFractionDigits: value < 1000 ? 1 : 0 })} L`;
+  };
+  const tiles = [
+    { label: t("flow.collected"), value: collectedM3, tone: "bg-blue-600/10 text-blue-700 dark:text-blue-300" },
+    { label: t("flow.used"), value: usedM3, tone: "bg-emerald-600/10 text-emerald-700 dark:text-emerald-300" },
+    { label: t(hasRecharge ? "flow.ground" : "flow.overflow"), value: groundM3, tone: "bg-teal-600/10 text-teal-700 dark:text-teal-300" },
+  ];
+  return (
+    <motion.section variants={fadeUp} initial="hidden" animate="show" aria-label={t("flow.title")} className="glass-card rounded-2xl p-4 sm:p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 font-semibold">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          </span>
+          {t("flow.title")}
+        </h3>
+        <span className="text-xs text-muted-foreground">{sinceLabel}</span>
+      </div>
+      <dl className="grid gap-3 sm:grid-cols-3">
+        {tiles.map((tile) => (
+          <div key={tile.label} className={cn("rounded-xl p-3", tile.tone)}>
+            <dt className="text-xs font-medium opacity-80">{tile.label}</dt>
+            <dd className="text-xl font-extrabold tabular-nums">{litres(tile.value)}</dd>
+          </div>
+        ))}
+      </dl>
+    </motion.section>
+  );
+};
+
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
@@ -129,7 +178,7 @@ export const HighlightCards = ({
   const [reportModalOpen, setReportModalOpen] = useState(false);
 
   // Live figures count from the exact moment the system was marked implemented
-  const now = useNow(10_000);
+  const now = useNow(2_000);
   const dynamicStats = useMemo(() => {
     if (!isImplemented) return null;
 
@@ -188,7 +237,15 @@ export const HighlightCards = ({
       netCost,
     };
 
+    // Where the collected rain went: used at home up to the share the site
+    // uses; the rest goes to the recharge pit (or overflows if there is none)
+    const usedShare = harvestM3 > 0 ? Math.min(1, waterUsedM3 / harvestM3) : 0;
+    const usedM3 = harvestedTillNowM3 * usedShare;
+    const groundM3 = harvestedTillNowM3 - usedM3;
+
     return {
+      usedM3,
+      groundM3,
       elapsed: elapsedParts(startDate, now),
       harvestedTillNowM3,
       harvestedTillNowLitres,
@@ -200,7 +257,7 @@ export const HighlightCards = ({
       startDate,
       reportData,
     };
-  }, [isImplemented, implementedAt, now, harvestM3, totalCost, subsidyAmount, annualSavings, result, site]);
+  }, [isImplemented, implementedAt, now, harvestM3, waterUsedM3, totalCost, subsidyAmount, annualSavings, result, site]);
 
   // Standard planning mode calculations
   const litres = Math.round(harvestM3 * 1000).toLocaleString(locale);
@@ -246,6 +303,15 @@ export const HighlightCards = ({
             tag={subsidyAmount > 0 ? "with subsidy" : "ROI on track"}
           />
         </motion.div>
+
+        {/* Live since installation: where the rain went, updating continuously */}
+        <LiveFlow
+          collectedM3={dynamicStats.harvestedTillNowM3}
+          usedM3={dynamicStats.usedM3}
+          groundM3={dynamicStats.groundM3}
+          hasRecharge={!["storage_only", "not_feasible"].includes(String(result.recommended_option ?? ""))}
+          sinceLabel={t(`live.since.${dynamicStats.elapsed.unit}`, { count: dynamicStats.elapsed.value })}
+        />
 
         {/* Monthly report statement modal */}
         <MonthlyReportModal

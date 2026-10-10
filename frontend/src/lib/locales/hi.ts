@@ -309,4 +309,8 @@ export const hi: Translations = {
   "apply.button": "आवेदन भरें",
   "apply.title": "सब्सिडी आवेदन पत्र",
   "apply.download": "भरा हुआ फ़ॉर्म डाउनलोड करें (PDF)",
+  "flow.title": "लगाने के बाद से लाइव",
+  "flow.collected": "अब तक जमा बारिश",
+  "flow.used": "घर में इस्तेमाल",
+  "flow.ground": "ज़मीन में भेजा गया",
 };

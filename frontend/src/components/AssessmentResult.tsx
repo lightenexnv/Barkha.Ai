@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, CheckCircle2, ChevronDown, CloudRain, Hammer, LogIn, MapPin, RotateCcw, Ruler, Save, Share2, ShieldAlert, Store, Wrench } from "lucide-react";
+import { CheckCircle2, ChevronDown, CloudRain, Hammer, LogIn, MapPin, Ruler, Save, Share2, ShieldAlert, Store, Wrench } from "lucide-react";
 import { shareMessage, whatsappUrl } from "@/lib/share";
 import { Button } from "@/components/ui/button";
 import { DrawnIcon } from "@/components/DrawnIcon";
@@ -13,7 +13,6 @@ import { fadeUp } from "@/components/motion/presets";
 import { FinancialStatement } from "@/components/results/FinancialStatement";
 import { HighlightCards } from "@/components/results/HighlightCards";
 import { MonsoonLive } from "@/components/results/MonsoonLive";
-import { RainReplay } from "@/components/results/RainReplay";
 import { RecommendationSection } from "@/components/results/RecommendationSection";
 import { SubsidyPanel } from "@/components/results/SubsidyPanel";
 import { defaultSelection, subsidyAmount, type SubsidySelection } from "@/components/results/subsidy";
@@ -30,7 +29,8 @@ interface AssessmentResultProps {
   result: AssessmentResultType;
   /** The inputs that produced this result, used for reports and saving. */
   input: SiteDetailsInput;
-  onNewAssessment: () => void;
+  /** Kept for callers; the results page no longer shows a "New Assessment" button */
+  onNewAssessment?: () => void;
 }
 
 const RECOMMENDATION_KEYS: Record<string, TranslationKey> = {
@@ -121,7 +121,7 @@ const GoodToKnow = ({ checks }: { checks: string[] }) => {
   );
 };
 
-export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentResultProps) => {
+export const AssessmentResult = ({ result, input }: AssessmentResultProps) => {
   const { t } = useLanguage();
   const units = useUnits();
   const { user, openAuthModal } = useAuth();
@@ -196,34 +196,15 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
           <p className="text-muted-foreground">{t("result.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-1 sm:pb-0 flex-nowrap shrink-0">
-          <Pressable className="shrink-0">
-            <Button
-              variant={implemented ? "outline" : "ocean"}
-              className={cn(
-                "whitespace-nowrap",
-                implemented && "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:border-destructive hover:bg-destructive/10 hover:text-destructive",
-              )}
-              onClick={handleToggleImplemented}
-            >
-              {implemented ? (
-                <>
-                  <Check className="me-2 h-4 w-4 text-emerald-500" />
-                  Implemented
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="me-2 h-4 w-4" />
-                  Confirm Implementation
-                </>
-              )}
-            </Button>
-          </Pressable>
-          <Pressable className="shrink-0">
-            <Button variant="outline" className="whitespace-nowrap" onClick={onNewAssessment}>
-              <RotateCcw className="me-2 h-4 w-4" />
-              {t("result.newAssessment")}
-            </Button>
-          </Pressable>
+          {/* Shown only until the system is confirmed as installed */}
+          {!implemented && (
+            <Pressable className="shrink-0">
+              <Button variant="ocean" className="whitespace-nowrap" onClick={handleToggleImplemented}>
+                <CheckCircle2 className="me-2 h-4 w-4" />
+                Confirm Implementation
+              </Button>
+            </Pressable>
+          )}
           <ReportDownloadMenu className="shrink-0" data={{ site: input, result }} />
           <Pressable className="shrink-0">
             <Button
@@ -292,14 +273,6 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
       {/* This week's rain on this roof */}
       <MonsoonLive input={input} result={result} />
 
-      {/* A year of this roof's rain, animated in 3D */}
-      <RainReplay
-        input={input}
-        result={result}
-        isImplemented={implemented}
-        implementedAt={implementedAt}
-      />
-
       {/* 3. What it costs */}
       {result.financial_statement ? (
         <FinancialStatement statement={result.financial_statement} />
@@ -341,28 +314,14 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
             Suppliers & Labor
           </Button>
         </Pressable>
-        <Pressable>
-          <Button
-            variant={implemented ? "outline" : "ocean"}
-            className={cn(
-              "font-medium",
-              implemented && "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:border-destructive hover:bg-destructive/10 hover:text-destructive",
-            )}
-            onClick={handleToggleImplemented}
-          >
-            {implemented ? (
-              <>
-                <Check className="me-2 h-4 w-4 text-emerald-500" />
-                Implemented (Undo)
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="me-2 h-4 w-4" />
-                Confirm Implementation
-              </>
-            )}
-          </Button>
-        </Pressable>
+        {!implemented && (
+          <Pressable>
+            <Button variant="ocean" className="font-medium" onClick={handleToggleImplemented}>
+              <CheckCircle2 className="me-2 h-4 w-4" />
+              Confirm Implementation
+            </Button>
+          </Pressable>
+        )}
         {!isSaved && user && (
           <Pressable>
             <Button variant="ocean" onClick={handleSave}>
@@ -371,12 +330,6 @@ export const AssessmentResult = ({ result, input, onNewAssessment }: AssessmentR
             </Button>
           </Pressable>
         )}
-        <Pressable>
-          <Button variant="outline" onClick={onNewAssessment}>
-            <RotateCcw className="me-2 h-4 w-4" />
-            {t("result.newAssessment")}
-          </Button>
-        </Pressable>
         <Pressable>
           <Button
             variant="outline"
