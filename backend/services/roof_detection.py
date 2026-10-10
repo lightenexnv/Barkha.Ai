@@ -204,6 +204,176 @@ def _grabcut_refine(image: np.ndarray, region: np.ndarray, seed: Tuple[int, int]
     return refined if 0.6 <= ratio <= 1.6 and not _touches_border(refined) else region
 
 
+# ---------- outline rectification ----------
+# A segmentation mask follows roof texture, so its outline is ragged: corners
+# are shaved off by polygon simplification, clutter (tanks, panels, parapet
+# shadows) bites notches into it, and a min-area rectangle of a noisy blob is
+# slightly rotated. Buildings are rectilinear, so the outline is rebuilt as an
+# orthogonal polygon aligned with the building edge direction, and every wall
+# is then snapped to the strongest nearby edge in the imagery.
+
+def _upright_angle(grey: np.ndarray, region: np.ndarray, mpp: float) -> float:
+    """
+    Rotation (degrees, for cv2.getRotationMatrix2D) that makes the building's
+    walls horizontal and vertical. Edge-direction histograms are biased by
+    pixel stair-steps on slanted edges, so instead the edge map around the
+    roof is rotated through candidate angles and the angle whose row and
+    column projections are sharpest (edges lined up) wins, as in document
+    deskewing.
+    """
+    band = max(3, int(round(2.0 / mpp)))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2 * band + 1, 2 * band + 1))
+    near = cv2.dilate(region, kernel)
+    ys, xs = np.where(near > 0)
+    if len(xs) == 0:
+        return 0.0
+    pad = band
+    y0, y1 = max(0, ys.min() - pad), min(grey.shape[0], ys.max() + pad + 1)
+    x0, x1 = max(0, xs.min() - pad), min(grey.shape[1], xs.max() + pad + 1)
+    crop = cv2.GaussianBlur(grey[y0:y1, x0:x1], (3, 3), 0).astype(np.float32)
+    weight = near[y0:y1, x0:x1].astype(np.float32)
+    h, w = crop.shape
+    centre = (w / 2.0, h / 2.0)
+
+    def sharpness(angle: float) -> float:
+        # Horizontal walls must line up in rows and vertical walls in columns.
+        # Directional gradients (not plain edge energy) keep roof texture and
+        # the mask's own shape from pulling the angle.
+        matrix = cv2.getRotationMatrix2D(centre, angle, 1.0)
+        rotated = cv2.warpAffine(crop, matrix, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        mask = cv2.warpAffine(weight, matrix, (w, h), flags=cv2.INTER_NEAREST)
+        gy = np.abs(cv2.Sobel(rotated, cv2.CV_32F, 0, 1, ksize=3)) * mask
+        gx = np.abs(cv2.Sobel(rotated, cv2.CV_32F, 1, 0, ksize=3)) * mask
+        strong = np.percentile(np.concatenate([gy[mask > 0], gx[mask > 0]]), 80) if mask.any() else 0
+        gy[gy < strong] = 0
+        gx[gx < strong] = 0
+        return float((gy.sum(axis=1) ** 2).sum() + (gx.sum(axis=0) ** 2).sum())
+
+    coarse = max(np.arange(-45.0, 45.0, 1.0), key=sharpness)
+    return float(max(np.arange(coarse - 1.0, coarse + 1.01, 0.1), key=sharpness))
+
+
+def _orthogonal_mask(mask: np.ndarray, seed: Tuple[int, int], mpp: float) -> np.ndarray:
+    """Redraw an upright mask on a ~1 m grid so every wall is horizontal or vertical."""
+    cell = max(2, int(round(1.0 / mpp)))
+    h, w = mask.shape
+    gh, gw = max(1, h // cell), max(1, w // cell)
+    coarse = cv2.resize(mask[: gh * cell, : gw * cell].astype(np.float32), (gw, gh), interpolation=cv2.INTER_AREA) >= 0.5
+    coarse = coarse.astype(np.uint8)
+    coarse = cv2.morphologyEx(coarse, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))  # fill notches up to ~2 m
+    coarse = cv2.morphologyEx(coarse, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))   # drop 1 m slivers
+    coarse = _fill_holes(coarse)
+    seed_cell = (min(gw - 1, seed[0] // cell), min(gh - 1, seed[1] // cell))
+    component = _component_at(coarse, seed_cell)
+    if not component.any():
+        component = coarse
+    full = np.zeros_like(mask)
+    full[: gh * cell, : gw * cell] = cv2.resize(component, (gw * cell, gh * cell), interpolation=cv2.INTER_NEAREST)
+    return full
+
+
+def _orthogonal_outline(mask: np.ndarray) -> np.ndarray:
+    """Corners of an orthogonal mask outline, or of its bounding box when nearly rectangular."""
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contour = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(contour)
+    if cv2.contourArea(contour) >= 0.84 * w * h or len(contour) > 16:
+        return np.array([[x, y], [x + w, y], [x + w, y + h], [x, y + h]], np.float32)
+    points = contour.reshape(-1, 2).astype(np.float32)
+    # Contour points are pixel centres; push right and bottom walls out by a
+    # pixel so the outline encloses the cells instead of cutting through them
+    cx, cy = points[:, 0].mean(), points[:, 1].mean()
+    points[:, 0] += (points[:, 0] > cx) * 1.0
+    points[:, 1] += (points[:, 1] > cy) * 1.0
+    return points
+
+
+def _edge_strength(grad: np.ndarray, horizontal: bool, position: float, start: float, end: float) -> float:
+    """Mean edge strength along a wall at `position`, over the middle 70% of its span."""
+    a, b = sorted((start, end))
+    trim = 0.15 * (b - a)
+    a, b = int(round(a + trim)), int(round(b - trim))
+    pos = int(round(position))
+    if b <= a:
+        return 0.0
+    if horizontal:
+        if not 0 <= pos < grad.shape[0]:
+            return 0.0
+        return float(grad[pos, max(0, a):min(grad.shape[1], b)].mean())
+    if not 0 <= pos < grad.shape[1]:
+        return 0.0
+    return float(grad[max(0, a):min(grad.shape[0], b), pos].mean())
+
+
+def _snap_walls(points: np.ndarray, grey: np.ndarray, mpp: float) -> np.ndarray:
+    """Move every wall of an orthogonal polygon onto the strongest nearby image edge."""
+    n = len(points)
+    blurred = cv2.GaussianBlur(grey, (3, 3), 0).astype(np.float32)
+    grad_y = np.abs(cv2.Sobel(blurred, cv2.CV_32F, 0, 1, ksize=3))  # edges of horizontal walls
+    grad_x = np.abs(cv2.Sobel(blurred, cv2.CV_32F, 1, 0, ksize=3))  # edges of vertical walls
+    centre = points.mean(axis=0)
+    # Walls may grow outward further (clutter makes the mask too small) than inward
+    outward, inward = int(round(2.5 / mpp)), int(round(1.5 / mpp))
+
+    walls = []  # (is_horizontal, position)
+    for i in range(n):
+        p, q = points[i], points[(i + 1) % n]
+        horizontal = abs(p[1] - q[1]) < abs(p[0] - q[0])
+        position = (p[1] + q[1]) / 2 if horizontal else (p[0] + q[0]) / 2
+        span = (p[0], q[0]) if horizontal else (p[1], q[1])
+        grad = grad_y if horizontal else grad_x
+        sign = 1 if position > (centre[1] if horizontal else centre[0]) else -1  # +1 points outward
+        base = _edge_strength(grad, horizontal, position, *span)
+        best, best_score = position, base
+        for step in range(-inward, outward + 1):
+            if step == 0:
+                continue
+            candidate = position + sign * step
+            # Slight preference for nearby edges over distant ones of similar strength
+            score = _edge_strength(grad, horizontal, candidate, *span) * (1 - 0.04 * abs(step) * mpp)
+            if score > best_score:
+                best, best_score = candidate, score
+        walls.append((horizontal, best if best_score > 1.15 * base else position))
+
+    snapped = np.zeros_like(points)
+    for i in range(n):
+        h_prev, pos_prev = walls[i - 1]
+        h_cur, pos_cur = walls[i]
+        if h_prev == h_cur:  # walls do not alternate here: keep the vertex
+            snapped[i] = points[i]
+        elif h_cur:
+            snapped[i] = (pos_prev, pos_cur)
+        else:
+            snapped[i] = (pos_cur, pos_prev)
+    return snapped
+
+
+def _rectify(image: np.ndarray, region: np.ndarray, seed: Tuple[int, int], mpp: float) -> Tuple[np.ndarray, float]:
+    """Orthogonal, edge-snapped roof outline in original pixel coordinates, plus rectangularity."""
+    grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    angle = _upright_angle(grey, region, mpp)
+    h, w = region.shape
+    centre = (float(seed[0]), float(seed[1]))
+    matrix = cv2.getRotationMatrix2D(centre, angle, 1.0)
+    rotated = cv2.warpAffine(region, matrix, (w, h), flags=cv2.INTER_NEAREST)
+    if not rotated.any():
+        raise RoofDetectionError("Roof outline could not be traced.")
+
+    rotated_grey = cv2.warpAffine(grey, matrix, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+    rotated_seed = cv2.transform(np.array([[centre]], np.float32), matrix)[0, 0]
+    upright = _orthogonal_mask(rotated, (int(rotated_seed[0]), int(rotated_seed[1])), mpp)
+    points = _orthogonal_outline(upright)
+    snapped = _snap_walls(points, rotated_grey, mpp)
+    before, after = _polygon_area(points), _polygon_area(snapped)
+    if before > 0 and 0.6 <= after / before <= 1.7:
+        points = snapped
+
+    inverse = cv2.invertAffineTransform(matrix)
+    original = cv2.transform(points.reshape(-1, 1, 2), inverse).reshape(-1, 2)
+    rectangularity = float(region.sum() / max(1.0, _polygon_area(original)))
+    return original.astype(np.float32), min(1.0, rectangularity)
+
+
 def _polygon(mask: np.ndarray) -> Tuple[np.ndarray, float]:
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     contour = max(contours, key=cv2.contourArea)
@@ -252,7 +422,11 @@ def _detect_in_image(image: np.ndarray, origin_x: int, origin_y: int, latitude: 
     region, tolerance = _adaptive_flood(smoothed, seed, mpp)
     region = _grabcut_refine(image, region, seed, mpp)
 
-    points, rectangularity = _polygon(region)
+    try:
+        points, rectangularity = _rectify(image, region, seed, mpp)
+    except (RoofDetectionError, cv2.error, ValueError) as e:
+        logger.info(f"Outline rectification skipped: {e}")
+        points, rectangularity = _polygon(region)
     area_m2 = _polygon_area(points) * mpp ** 2
     if area_m2 < MIN_ROOF_M2:
         raise RoofDetectionError("The detected surface is too small to be a roof. Re-pin nearer the roof centre.")
@@ -276,6 +450,6 @@ def _detect_in_image(image: np.ndarray, origin_x: int, origin_y: int, latitude: 
         "metres_per_pixel": round(mpp, 4),
         "rectangularity": round(rectangularity, 2),
         "colour_tolerance": tolerance,
-        "method": "mean-shift + adaptive flood fill + GrabCut",
+        "method": "mean-shift + adaptive flood fill + GrabCut + orthogonal edge-snapped outline",
         "imagery": "Esri World Imagery",
     }
