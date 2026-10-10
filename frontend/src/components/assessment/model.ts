@@ -26,6 +26,12 @@ export const EMPTY_ROOF: RoofState = {
 
 export const MAX_ROOF_M2 = 100_000;
 
+/**
+ * Map height that keeps the whole map (controls and overlays included) on
+ * screen below the navbar, progress bar and step title.
+ */
+export const MAP_VIEWPORT_CLASS = "h-[clamp(260px,calc(100svh-25rem),560px)] sm:h-[clamp(300px,calc(100svh-22rem),640px)]";
+
 export interface SiteDetails {
   site_name: string;
   roof_material: (typeof ROOF_MATERIALS)[number];

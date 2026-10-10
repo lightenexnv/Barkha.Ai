@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Loader2, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,7 @@ export const AssessmentWizard = ({ seed }: { seed?: WizardSeed }) => {
   const { preferences } = useSettings();
 
   const [step, setStep] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
   // Furthest step opened so far; a later step unlocks only after its predecessor was visited
   const [maxVisited, setMaxVisited] = useState(0);
   const [location, setLocation] = useState<LatLon>(seed?.location ?? [0, 0]);
@@ -94,7 +96,9 @@ export const AssessmentWizard = ({ seed }: { seed?: WizardSeed }) => {
     (index: number) => {
       setStep(index);
       setMaxVisited((visited) => Math.max(visited, index));
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      // Bring the progress bar to just under the sticky navbar so the step fits on screen
+      const top = rootRef.current ? rootRef.current.getBoundingClientRect().top + window.scrollY - 80 : 0;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
     },
     [],
   );
@@ -197,7 +201,7 @@ export const AssessmentWizard = ({ seed }: { seed?: WizardSeed }) => {
   const slowCalculation = useSlowFlag(computation.status === "running");
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div ref={rootRef} className="mx-auto max-w-7xl space-y-6">
       <WorkflowStepper
         steps={steps}
         current={step}
@@ -206,7 +210,14 @@ export const AssessmentWizard = ({ seed }: { seed?: WizardSeed }) => {
         onSelect={goTo}
       />
 
-      <div key={STEP_IDS[step]} className="animate-in fade-in-0 slide-in-from-bottom-3 duration-500">
+      <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={STEP_IDS[step]}
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -16 }}
+        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      >
         {step === 0 && (
           <LocationStep
             location={location}
@@ -287,7 +298,8 @@ export const AssessmentWizard = ({ seed }: { seed?: WizardSeed }) => {
             )}
           </div>
         )}
-      </div>
+      </motion.div>
+      </AnimatePresence>
     </div>
   );
 };

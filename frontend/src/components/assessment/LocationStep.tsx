@@ -10,6 +10,7 @@ import { isValidCoordinate } from "@/lib/climate";
 import type { LatLon } from "@/lib/geo";
 import { PlaceSearch } from "./PlaceSearch";
 import { RainfallPanel } from "./RainfallPanel";
+import { MAP_VIEWPORT_CLASS } from "./model";
 import { SatelliteMap, type MapFocus } from "./SatelliteMap";
 
 const INDIA_CENTER: LatLon = [22.5, 79];
@@ -63,7 +64,7 @@ export const LocationStep = ({ location, onChange, climate, onContinue, canConti
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <div className="space-y-5">
         <div className="space-y-1.5">
           <h2 className="text-2xl font-bold">{t("location.title")}</h2>
@@ -124,7 +125,7 @@ export const LocationStep = ({ location, onChange, climate, onContinue, canConti
         focus={focus}
         pin={hasLocation ? location : null}
         onPick={(point) => onChange(point)}
-        className="h-[360px] sm:h-[460px] lg:h-full lg:min-h-[560px]"
+        className={`${MAP_VIEWPORT_CLASS} lg:sticky lg:top-24`}
       />
     </div>
   );

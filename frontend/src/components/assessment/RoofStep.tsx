@@ -10,7 +10,7 @@ import { useUnits } from "@/context/SettingsContext";
 import { api, ApiError } from "@/lib/api";
 import { polygonAreaM2, type LatLon } from "@/lib/geo";
 import { useSlowFlag } from "@/hooks/useSlowFlag";
-import { EMPTY_ROOF, MAX_ROOF_M2, type RoofState } from "./model";
+import { EMPTY_ROOF, MAP_VIEWPORT_CLASS, MAX_ROOF_M2, type RoofState } from "./model";
 import { SatelliteMap, type MapFocus } from "./SatelliteMap";
 
 type Detection = { status: "idle" } | { status: "detecting" } | { status: "error"; message: string };
@@ -135,7 +135,7 @@ export const RoofStep = ({ location, roof, onChange, onBack, onConfirm }: RoofSt
           polygon={roof.polygon}
           onPolygonChange={roof.polygon && !detecting ? adjustPolygon : undefined}
           polygonTone={roof.method === "adjusted" ? "adjusted" : "detected"}
-          className={cn("h-[420px] sm:h-[540px]", !detecting && "[&_.leaflet-container]:cursor-crosshair")}
+          className={cn(MAP_VIEWPORT_CLASS, !detecting && "[&_.leaflet-container]:cursor-crosshair")}
         >
           {/* Prompt / progress overlay */}
           <div className="pointer-events-none absolute inset-x-0 top-3 z-[1000] flex justify-center px-3">
