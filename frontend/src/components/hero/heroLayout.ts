@@ -15,7 +15,7 @@ const DESKTOP_BREAKPOINT = 1024;
 // as a fraction of its width.
 const ISLAND_REACH = { up: 0.6, down: 0.42, side: 0.52 };
 // How far below the waterline the island is anchored, as a fraction of its width.
-const ISLAND_SINK = 0.04;
+const ISLAND_SINK = -0.16;
 
 export interface HeroLayout {
   isDesktop: boolean;

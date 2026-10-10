@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogIn, LogOut, Menu, Wrench, X } from "lucide-react";
+import { LogIn, LogOut, Menu, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { DrawnIcon } from "@/components/DrawnIcon";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -62,9 +62,18 @@ export const Header = () => {
             <BrandLogo tagline />
           </Link>
 
-          {/* Language, account and actions */}
+          {/* Order: Start Assessment, Maintenance & Installation, account, language */}
           <div className="hidden items-center gap-2 lg:flex">
-            <LanguageSwitcher compact />
+            <Pressable>
+              <Button size="sm" variant="ocean" asChild>
+                <Link to="/assess">{t("nav.startAssessment")}</Link>
+              </Button>
+            </Pressable>
+            <Pressable>
+              <Button size="sm" variant="outline" onClick={openService} className="border-primary/40 text-primary">
+                {t("nav.service")}
+              </Button>
+            </Pressable>
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -105,22 +114,12 @@ export const Header = () => {
                 </Button>
               </Pressable>
             )}
-            <Pressable>
-              <Button size="sm" variant="ocean" asChild>
-                <Link to="/assess">{t("nav.startAssessment")}</Link>
-              </Button>
-            </Pressable>
-            <Pressable>
-              <Button size="sm" variant="outline" onClick={openService} className="border-primary/40 text-primary">
-                <Wrench className="me-2 h-4 w-4" />
-                {t("nav.service")}
-              </Button>
-            </Pressable>
+            <LanguageSwitcher iconOnly />
           </div>
 
           {/* Mobile */}
           <div className="flex items-center gap-2 lg:hidden">
-            <LanguageSwitcher compact />
+            <LanguageSwitcher iconOnly />
             <motion.button
               whileTap={{ scale: 0.9 }}
               transition={spring}
@@ -160,7 +159,6 @@ export const Header = () => {
                   </Link>
                 </Button>
                 <Button size="sm" variant="outline" className="w-full border-primary/40 text-primary" onClick={openService}>
-                  <Wrench className="me-2 h-4 w-4" />
                   {t("nav.service")}
                 </Button>
                 {user ? (
