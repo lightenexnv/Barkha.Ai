@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 
 from core.config import CORS_ORIGINS
-from core.database import mongo_client, mongo_db
+from core.database import mongo_client, mongo_db, mongo_error
 from api.endpoints import router as api_router
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,8 @@ app.include_router(api_router, prefix="/api")
 
 @app.on_event("startup")
 def create_indexes():
+    if mongo_db is None:
+        return
     try:
         mongo_db.assessments.create_index("created_at")
         mongo_db.assessments.create_index("is_synced")
@@ -36,12 +38,14 @@ def create_indexes():
 
 @app.get("/health")
 async def health_check():
+    database, error = "connected", None
     try:
+        if mongo_client is None:
+            raise RuntimeError(mongo_error)
         mongo_client.admin.command("ping")
-        database = "connected"
-    except Exception:
-        database = "unreachable"
-    return {"status": "healthy", "database": database, "timestamp": datetime.now()}
+    except Exception as e:
+        database, error = "unreachable", str(e)[:300]
+    return {"status": "healthy", "database": database, "database_error": error, "timestamp": datetime.now()}
 
 @app.get("/")
 async def root():

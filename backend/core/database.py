@@ -41,6 +41,14 @@ class SafeRedis:
 
 redis_client = SafeRedis(REDIS_URL)
 
-# MongoDB setup (primary data store)
-mongo_client = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=5000, tz_aware=False)
-mongo_db = mongo_client[MONGODB_DB_NAME]
+# MongoDB setup (primary data store). A bad URL must not crash startup,
+# otherwise Render only shows a 502 and /health can't report the cause.
+mongo_error = None
+try:
+    mongo_client = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=5000, tz_aware=False)
+    mongo_db = mongo_client[MONGODB_DB_NAME]
+except Exception as e:
+    logger.error(f"Could not initialize MongoDB client: {e}")
+    mongo_error = str(e)
+    mongo_client = None
+    mongo_db = None
