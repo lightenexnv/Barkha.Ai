@@ -283,4 +283,5 @@ export const hi: Translations = {
   "subsidy.title": "सरकारी सब्सिडी के अवसर",
   "subsidy.netTitle": "सांकेतिक शुद्ध परियोजना लागत",
   "subsidy.projection": "केवल सांकेतिक अनुमान, गारंटीशुदा कटौती नहीं।",
+  "nav.service": "रखरखाव और स्थापना",
 };

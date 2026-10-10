@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { MotionConfig } from "framer-motion";
 import { AuthModal } from "@/components/AuthModal";
 import { AuthProvider } from "@/context/AuthContext";
 import { LanguageProvider } from "@/context/LanguageContext";
@@ -17,6 +18,8 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    {/* Honour the OS "reduce motion" setting for every framer-motion animation */}
+    <MotionConfig reducedMotion="user">
     <ThemeProvider attribute="class" defaultTheme="light" storageKey="barkha_theme" disableTransitionOnChange>
       <LanguageProvider>
         <SettingsProvider>
@@ -41,6 +44,7 @@ const App = () => (
         </SettingsProvider>
       </LanguageProvider>
     </ThemeProvider>
+    </MotionConfig>
   </QueryClientProvider>
 );
 

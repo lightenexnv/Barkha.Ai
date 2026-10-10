@@ -21,6 +21,7 @@ export const en = {
   "nav.settings": "Settings",
   "nav.startAssessment": "Start Assessment",
   "nav.toggleMenu": "Toggle menu",
+  "nav.service": "Maintenance & Installation",
 
   // Authentication
   "auth.signIn": "Sign In",

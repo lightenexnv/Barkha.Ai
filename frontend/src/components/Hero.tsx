@@ -1,7 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Satellite } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
+import { Pressable, Reveal } from "@/components/motion/Motion";
+import { fadeUp, stagger } from "@/components/motion/presets";
 import { Icon3D, type Icon3DName } from "@/components/Icon3D";
 import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-rainwater.png";
@@ -197,46 +200,38 @@ export const Hero = () => {
               className={`relative z-10 pb-20 ${layout.isDesktop ? "" : "text-center"}`}
               style={{ paddingTop: layout.contentTop }}
             >
-              <div style={columnStyle} className="space-y-8">
-                <p className={`text-lg leading-relaxed text-white/80 ${layout.isDesktop ? "max-w-md" : "mx-auto max-w-md"}`}>
-                  Transform rooftops into sustainable water sources. Get professional feasibility reports, cost
-                  analysis, and implementation guidance in minutes.
-                </p>
+              <motion.div
+                style={columnStyle}
+                className="space-y-8"
+                initial="hidden"
+                animate="show"
+                variants={stagger(0.12, 0.35)}
+              >
+                <motion.div variants={fadeUp} className={layout.isDesktop ? "" : "flex justify-center"}>
+                  <Pressable>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      asChild
+                      className="h-14 border-white bg-white px-9 text-lg font-semibold text-[#0b2540] shadow-[0_12px_40px_-12px_rgba(34,211,238,0.8)] hover:border-white hover:bg-white hover:text-primary"
+                    >
+                      <Link to="/assess" className="group">
+                        Get Started
+                        <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                      </Link>
+                    </Button>
+                  </Pressable>
+                </motion.div>
 
-                <div className={`flex flex-col gap-3 sm:flex-row ${layout.isDesktop ? "" : "sm:justify-center"}`}>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    asChild
-                    className="border-white bg-white text-[#0b2540] shadow-lg hover:scale-[1.03] hover:border-white hover:bg-white hover:text-primary"
-                  >
-                    <Link to="/assess" className="group">
-                      Start Free Assessment
-                      <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-                    </Link>
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="glass"
-                    asChild
-                    className="text-white hover:bg-white/20"
-                  >
-                    <Link to="/assess">
-                      <Satellite className="h-5 w-5" />
-                      Pin Your Roof on the Map
-                    </Link>
-                  </Button>
-                </div>
-
-                <dl className="grid grid-cols-3 gap-4 border-t border-white/15 pt-6">
+                <motion.dl variants={fadeUp} className="grid grid-cols-3 gap-4 border-t border-white/15 pt-6">
                   {stats.map((stat) => (
                     <div key={stat.label} className="flex flex-col-reverse gap-1">
                       <dt className="text-xs text-white/60 sm:text-sm">{stat.label}</dt>
                       <dd className="text-base font-semibold text-white sm:text-lg">{stat.value}</dd>
                     </div>
                   ))}
-                </dl>
-              </div>
+                </motion.dl>
+              </motion.div>
             </div>
           </>
         )}
@@ -250,12 +245,15 @@ export const Hero = () => {
               Everything you need to plan a rainwater system
             </h2>
           </div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Reveal className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {features.map((feature) => {
               return (
-                <div
+                <motion.div
                   key={feature.title}
-                  className="group glass-card rounded-xl p-6 transition-transform duration-300 hover:-translate-y-1"
+                  variants={fadeUp}
+                  whileHover={{ y: -6 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                  className="group glass-card rounded-xl p-6"
                 >
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/5">
                     <Icon3D
@@ -265,10 +263,10 @@ export const Hero = () => {
                   </div>
                   <h3 className="mb-2 font-semibold">{feature.title}</h3>
                   <p className="text-sm text-muted-foreground">{feature.description}</p>
-                </div>
+                </motion.div>
               );
             })}
-          </div>
+          </Reveal>
         </div>
       </section>
     </>

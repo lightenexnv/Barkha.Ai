@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -13,11 +12,6 @@ export const Footer = () => {
           <BrandLogo tagline />
           <p className="text-sm text-muted-foreground">{t("footer.tagline")}</p>
         </div>
-        <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm" aria-label="Footer">
-          <Link to="/" className="text-muted-foreground hover:text-foreground">{t("nav.dashboard")}</Link>
-          <Link to="/assess" className="text-muted-foreground hover:text-foreground">{t("nav.newAssessment")}</Link>
-          <Link to="/settings" className="text-muted-foreground hover:text-foreground">{t("nav.settings")}</Link>
-        </nav>
       </div>
       <div className="border-t border-border/60">
         <p className="container mx-auto px-4 py-4 text-xs text-muted-foreground sm:px-6 lg:px-8">
