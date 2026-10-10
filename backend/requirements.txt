@@ -11,3 +11,4 @@ python-dotenv
 redis
 pymongo
 motor
+python-multipart
